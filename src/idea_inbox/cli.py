@@ -4,6 +4,8 @@ import argparse
 import sys
 from collections.abc import Sequence
 
+from idea_inbox.storage.sqlite import SQLiteMigrationError, SQLiteStorageBackend
+
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8080
 
@@ -43,6 +45,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "migrate",
         help="apply deterministic storage migrations for the configured backend",
     )
+    migrate.add_argument(
+        "--database",
+        default="idea-inbox.sqlite3",
+        help="SQLite database path to migrate (default: idea-inbox.sqlite3)",
+    )
     migrate.set_defaults(handler=_run_migrate)
 
     serve = subcommands.add_parser(
@@ -71,14 +78,17 @@ def _run_dev(args: argparse.Namespace) -> int:
     return 1
 
 
-def _run_migrate(_args: argparse.Namespace) -> int:
-    print(
-        "idea-inbox: database migrations are not implemented yet; "
-        "the CLI parsed migrate successfully and will wire into the storage migration module "
-        "when it exists.",
-        file=sys.stderr,
-    )
-    return 1
+def _run_migrate(args: argparse.Namespace) -> int:
+    storage = SQLiteStorageBackend(args.database)
+    try:
+        storage.migrate()
+    except SQLiteMigrationError as exc:
+        print(f"idea-inbox: failed to apply SQLite migrations: {exc}", file=sys.stderr)
+        return 1
+    finally:
+        storage.close()
+    print(f"Applied SQLite migrations to {args.database}")
+    return 0
 
 
 def _run_serve(args: argparse.Namespace) -> int:

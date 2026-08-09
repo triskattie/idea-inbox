@@ -56,7 +56,6 @@ def test_invalid_invocations_exit_two_with_usage_error(
     ("args", "expected_message"),
     [
         (["dev"], "development API startup is not implemented yet"),
-        (["migrate"], "database migrations are not implemented yet"),
         (
             ["serve", "--host", "127.0.0.1", "--port", "8080"],
             "API server startup is not implemented yet",
@@ -72,3 +71,16 @@ def test_planned_commands_dispatch_to_actionable_startup_failures(
     assert stdout == ""
     assert expected_message in stderr
     assert "secrets" not in stderr.lower()
+
+
+def test_migrate_applies_sqlite_migrations_to_requested_database(
+    tmp_path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    database_path = tmp_path / "idea-inbox.sqlite3"
+
+    exit_code, stdout, stderr = invoke_cli(["migrate", "--database", str(database_path)], capsys)
+
+    assert exit_code == 0
+    assert stderr == ""
+    assert stdout == f"Applied SQLite migrations to {database_path}\n"
+    assert database_path.exists()

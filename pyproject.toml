@@ -11,6 +11,9 @@ dependencies = []
 [tool.uv]
 package = true
 
+[tool.setuptools.package-data]
+idea_inbox = ["storage/migrations/*.sql"]
+
 [project.scripts]
 idea-inbox = "idea_inbox.cli:main"
 
