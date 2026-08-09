@@ -1,1 +1,1 @@
-"""Storage adapter implementations."""
+"""Storage backends for Idea Inbox."""

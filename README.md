@@ -48,6 +48,10 @@ This repository is still being initialized, so the current command only verifies
 providers by default; it does not require hosted-model credentials, hidden outbound model
 calls, or telemetry.
 
+SQLite configuration now defaults to `sqlite:///./data/idea-inbox.sqlite3` relative to the
+project root. Override the database location with `IDEA_INBOX_DATABASE_URL` or
+`IDEA_INBOX_SQLITE_PATH`, but not both.
+
 ## CLI usage
 
 ### Smoke command

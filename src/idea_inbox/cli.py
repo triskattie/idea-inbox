@@ -4,6 +4,7 @@ import argparse
 import sys
 from collections.abc import Sequence
 
+from idea_inbox.config import ConfigError, load_config
 from idea_inbox.storage.sqlite import SQLiteMigrationError, SQLiteStorageBackend
 
 DEFAULT_HOST = "127.0.0.1"
@@ -47,8 +48,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     migrate.add_argument(
         "--database",
-        default="idea-inbox.sqlite3",
-        help="SQLite database path to migrate (default: idea-inbox.sqlite3)",
+        help="SQLite database path to migrate (default: configured IDEA_INBOX database path)",
     )
     migrate.set_defaults(handler=_run_migrate)
 
@@ -79,7 +79,14 @@ def _run_dev(args: argparse.Namespace) -> int:
 
 
 def _run_migrate(args: argparse.Namespace) -> int:
-    storage = SQLiteStorageBackend(args.database)
+    try:
+        config = load_config()
+    except ConfigError as exc:
+        print(f"idea-inbox: invalid configuration: {exc}", file=sys.stderr)
+        return 1
+
+    database_path = args.database or config.database_path
+    storage = SQLiteStorageBackend(database_path)
     try:
         storage.migrate()
     except SQLiteMigrationError as exc:
@@ -87,7 +94,7 @@ def _run_migrate(args: argparse.Namespace) -> int:
         return 1
     finally:
         storage.close()
-    print(f"Applied SQLite migrations to {args.database}")
+    print(f"Applied SQLite migrations to {database_path}")
     return 0
 
 

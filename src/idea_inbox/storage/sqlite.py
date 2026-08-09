@@ -9,6 +9,7 @@ from contextlib import contextmanager
 from importlib import resources
 from pathlib import Path
 
+from idea_inbox.config import AppConfig
 from idea_inbox.core.models import Idea, RawEvent
 
 MIGRATION_PACKAGE = "idea_inbox.storage.migrations"
@@ -23,6 +24,23 @@ def _connect(path: str | Path) -> sqlite3.Connection:
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     return connection
+
+
+@contextmanager
+def open_sqlite_database(config: AppConfig) -> Iterator[sqlite3.Connection]:
+    """Open the configured SQLite database with app-wide connection defaults."""
+    if config.database_path != Path(":memory:"):
+        config.database_path.parent.mkdir(parents=True, exist_ok=True)
+
+    connection = _connect(config.database_path)
+    try:
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
 
 def _has_fts5(connection: sqlite3.Connection) -> bool:
@@ -79,9 +97,12 @@ def _idea_from_row(row: sqlite3.Row) -> Idea:
 class SQLiteStorageBackend:
     """SQLite implementation of the authoritative storage boundary."""
 
-    def __init__(self, database_path: str | Path) -> None:
+    def __init__(self, database_path: str | Path | AppConfig) -> None:
+        if isinstance(database_path, AppConfig):
+            database_path = database_path.database_path
         self.database_path = Path(database_path)
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
+        if self.database_path != Path(":memory:"):
+            self.database_path.parent.mkdir(parents=True, exist_ok=True)
         self._connection = _connect(self.database_path)
 
     @property

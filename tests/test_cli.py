@@ -84,3 +84,17 @@ def test_migrate_applies_sqlite_migrations_to_requested_database(
     assert stderr == ""
     assert stdout == f"Applied SQLite migrations to {database_path}\n"
     assert database_path.exists()
+
+
+def test_migrate_uses_configured_default_database_path(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    exit_code, stdout, stderr = invoke_cli(["migrate"], capsys)
+
+    database_path = tmp_path / "data" / "idea-inbox.sqlite3"
+    assert exit_code == 0
+    assert stderr == ""
+    assert stdout == f"Applied SQLite migrations to {database_path}\n"
+    assert database_path.exists()
