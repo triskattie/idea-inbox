@@ -14,6 +14,7 @@ This spec consolidates the repository discovery in
 - [`../connectors.md`](../connectors.md)
 - [`../providers.md`](../providers.md)
 - [`../self-hosting.md`](../self-hosting.md)
+- [`sqlite-schema-plan.md`](sqlite-schema-plan.md)
 - [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md)
 - [`../decisions/ADR-001-connector-and-provider-boundaries.md`](../decisions/ADR-001-connector-and-provider-boundaries.md)
 - [`../decisions/ADR-002-sqlite-default-postgres-production.md`](../decisions/ADR-002-sqlite-default-postgres-production.md)
@@ -462,7 +463,7 @@ Required SQLite tables:
 - Stores idea id, provider id, vector dimensions, vector payload, and timestamps.
 - SQLite vector storage can be simple serialized blobs until a better local extension is specified.
 
-Migrations should be deterministic files in the repository, applied by CLI/server startup in dev mode or through an explicit migration command. Tests should run against temporary SQLite databases.
+Migrations should be deterministic files in the repository, applied by CLI/server startup in dev mode or through an explicit migration command. Tests should run against temporary SQLite databases. The concrete first-pass table list, data mapping, indexes, timestamps, and migration order are maintained in [`sqlite-schema-plan.md`](sqlite-schema-plan.md).
 
 ## Search design
 
