@@ -18,6 +18,10 @@ htmlcov/
 .env.*
 !.env.example
 
+# Local agent/tooling state
+.hermes/
+.worktrees/
+
 # Build/editor
 build/
 dist/
