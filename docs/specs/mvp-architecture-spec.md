@@ -20,6 +20,7 @@ This spec consolidates the repository discovery in
 - [`../decisions/ADR-003-cited-retrieval-answers.md`](../decisions/ADR-003-cited-retrieval-answers.md)
 - [`../decisions/ADR-004-credential-providers.md`](../decisions/ADR-004-credential-providers.md)
 - [`../decisions/ADR-005-raw-events-derived-ideas.md`](../decisions/ADR-005-raw-events-derived-ideas.md)
+- [`../decisions/ADR-006-mvp-scope-and-local-first-self-hosting.md`](../decisions/ADR-006-mvp-scope-and-local-first-self-hosting.md)
 
 ## Product goal
 
@@ -88,17 +89,16 @@ A change is done only when:
 - API responses follow the `/v1` and error-shape standards.
 - The handoff states what was touched and what was intentionally left out.
 
-Planned verification commands are:
+Runnable verification commands for the current repository are:
 
 ```bash
 uv sync
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy src
 uv run pytest
 ```
 
-Until `uv` and `mypy` are available in the local environment, workers may use an isolated virtual environment for `pytest` and `ruff`, but should record the fallback in their handoff.
+If `uv` is unavailable, workers may use an isolated virtual environment for `pytest` and `ruff`, but should record the fallback in their handoff. Type checking with `mypy` is planned but must not be required in local verification or CI until `mypy` is added to the dev dependency group and configured in `pyproject.toml`.
 
 ## Architecture overview
 
@@ -123,6 +123,12 @@ src/idea_inbox/
 ```
 
 Core code may depend on protocols and plain domain data types only. Adapter modules depend inward on core contracts. API routes, connector handlers, provider implementations, and storage backends should be replaceable without changing the core ingestion/query services.
+
+### Current implementation baseline
+
+The current repository is an executable skeleton, not an API implementation. As of this spec review, `pyproject.toml` exposes the `idea-inbox` console script at `idea_inbox.cli:main`, `src/idea_inbox/cli.py` only prints an implementation-pending message, and the only package code present is `cli.py` plus package metadata in `__init__.py`.
+
+The directory layout above is therefore the target implementation boundary, not an existing package map. Phase 1 must create the CLI command surface and first source directories before later cards add API, storage, search, connector, or provider behavior. Until those commands exist, user-facing docs should keep distinguishing the current smoke command (`uv run idea-inbox`) from planned commands such as `idea-inbox dev` or `idea-inbox serve`.
 
 ## Core domain concepts and interfaces
 
@@ -561,6 +567,8 @@ idea-inbox serve --host 127.0.0.1 --port 8080
 
 `dev` should run the local API with SQLite and mock/local providers by default. It should fail with actionable messages when required configuration is missing.
 
+These are target MVP commands. They are not current quick-start commands until Phase 1 implements command parsing and tests the behavior. Documentation that describes current setup should continue to use the existing smoke command and explicitly label `dev`, `migrate`, and `serve` as planned until they are implemented.
+
 Configuration should cover:
 
 - SQLite database URL/path.
@@ -658,6 +666,20 @@ The MVP is accepted when all of the following are true:
 8. SQLite is healthy as the default local backend.
 9. Optional hosted AI paths are configurable but not required.
 10. Docs link the implemented command/configuration surface and note which connectors/providers are available versus planned.
+
+## Implementation review notes and risks
+
+This spec has been checked against the current repository skeleton, `CONTRIBUTING.md`, `pyproject.toml`, the README, supporting docs, and ADR-001 through ADR-006. The main boundaries are implementable in small TDD slices, with these constraints for downstream tasks:
+
+1. Phase 1 is a prerequisite for later implementation. The target module layout, `idea-inbox dev`, `idea-inbox migrate`, and `idea-inbox serve` do not exist yet, so later tasks should not assume route, storage, connector, or provider packages are present before creating them with tests.
+2. Verification must match configured tooling. `pytest`, `ruff check`, and `ruff format --check` are current gates; `mypy` remains planned until configured.
+3. API pagination needs a concrete shared schema before the first list/search route lands. Use a cursor or limit/offset shape consistently, test invalid limits, and keep all list endpoints paginated from day one.
+4. Persistence and indexing need an explicit consistency rule. `IngestionService` should save raw events and ideas transactionally, then update `SearchIndex` in a way that can be retried or rebuilt without losing the authoritative storage record.
+5. ID and timestamp generation should be centralized before multiple adapters exist, so connectors do not invent incompatible identifiers or timezone handling.
+6. `CredentialProvider.get(...)` needs a concrete return type before real providers land. It should support no-secret/local/mock flows and avoid forcing model providers to know whether credentials came from env vars, static config, OAuth, a proxy, or local auth.
+7. Connector implementation order should start with manual API and generic webhook fixtures before platform SDKs. Telegram, email, and Discord connector work should stay fixture-driven until credentials, polling/webhook modes, and retry behavior are specified.
+8. Citation behavior should resolve final citations through stored `Idea` records and raw-event lineage, not only through FTS snippets or model-generated references.
+9. Multi-user ownership remains out of scope. If future-proof fields are introduced, they should be nullable metadata or clearly single-operator placeholders, not implicit security boundaries.
 
 ## Future work
 

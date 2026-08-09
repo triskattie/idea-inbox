@@ -30,10 +30,18 @@ This repository is currently being initialized. See:
 
 ## Quick start
 
+Current local smoke setup:
+
 ```bash
 uv sync
 cp .env.example .env
-uv run idea-inbox dev
+uv run idea-inbox
 ```
 
-The implementation will keep SQLite as the zero-friction default and Docker Compose as the self-host path.
+This repository is still being initialized, so the current command only verifies that the package and CLI entry point run. The local development path uses SQLite plus mock/local
+providers by default; it does not require hosted-model credentials, hidden outbound model
+calls, or telemetry.
+
+Planned self-hosting targets are documented in [Self-hosting](docs/self-hosting.md). Docker
+and Docker Compose support are planned deployment targets, but this repository does not yet
+include a Dockerfile, Compose file, or confirmed published image.

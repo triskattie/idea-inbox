@@ -19,15 +19,31 @@ No feature work starts without:
 
 ## Commands
 
-Planned project commands:
+Install uv first if it is not already available: https://docs.astral.sh/uv/getting-started/installation/
+
+Runnable now:
 
 ```bash
 uv sync
 uv run ruff check .
 uv run ruff format --check .
-uv run mypy src
 uv run pytest
 ```
+
+If uv is unavailable, use an isolated virtual environment instead of the system Python:
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -e . pytest ruff
+.venv/bin/python -m ruff check .
+.venv/bin/python -m ruff format --check .
+.venv/bin/python -m pytest
+```
+
+Planned until configured:
+
+- Type checking with mypy. Do not require `mypy` in local verification or CI until it is
+  added to the dev dependency group and configured in `pyproject.toml`.
 
 ## Architecture rules
 
@@ -112,7 +128,7 @@ A task is done only when:
 
 - acceptance criteria are met
 - tests are written and passing
-- lint/format/type checks pass
+- lint/format checks pass, and configured type checks pass
 - docs are updated if behavior/user-facing/API changed
 - ADR is added/updated if architecture changed
 - Docker/dev setup still works if touched
