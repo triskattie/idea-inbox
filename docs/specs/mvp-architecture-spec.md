@@ -126,9 +126,9 @@ Core code may depend on protocols and plain domain data types only. Adapter modu
 
 ### Current implementation baseline
 
-The current repository is an executable skeleton, not an API implementation. As of this spec review, `pyproject.toml` exposes the `idea-inbox` console script at `idea_inbox.cli:main`, `src/idea_inbox/cli.py` only prints an implementation-pending message, and the only package code present is `cli.py` plus package metadata in `__init__.py`.
+The current repository is an executable skeleton, not an API implementation. As of this spec review, `pyproject.toml` exposes the `idea-inbox` console script at `idea_inbox.cli:main`, `src/idea_inbox/cli.py` parses the planned `dev`, `migrate`, and `serve` commands, and the only package code present is `cli.py` plus package metadata in `__init__.py`.
 
-The directory layout above is therefore the target implementation boundary, not an existing package map. Phase 1 must create the CLI command surface and first source directories before later cards add API, storage, search, connector, or provider behavior. Until those commands exist, user-facing docs should keep distinguishing the current smoke command (`uv run idea-inbox`) from planned commands such as `idea-inbox dev` or `idea-inbox serve`.
+The directory layout above is therefore the target implementation boundary, not an existing package map. Phase 1 must connect the CLI command surface to first source directories before later cards add API, storage, search, connector, or provider behavior. Until those runtime targets exist, user-facing docs should keep distinguishing the current smoke command (`uv run idea-inbox`) from startup commands such as `idea-inbox dev` or `idea-inbox serve`, which currently parse options and fail with actionable not-implemented errors.
 
 ## Core domain concepts and interfaces
 
@@ -567,7 +567,7 @@ idea-inbox serve --host 127.0.0.1 --port 8080
 
 `dev` should run the local API with SQLite and mock/local providers by default. It should fail with actionable messages when required configuration is missing.
 
-These are target MVP commands. They are not current quick-start commands until Phase 1 implements command parsing and tests the behavior. Documentation that describes current setup should continue to use the existing smoke command and explicitly label `dev`, `migrate`, and `serve` as planned until they are implemented.
+These are target MVP commands. Phase 1 implements command parsing before the API, storage, and server runtimes exist. Documentation that describes current setup should continue to use the existing smoke command and explicitly label `dev`, `migrate`, and `serve` as startup targets until their underlying runtime modules are implemented.
 
 ### Planned CLI command contract
 
