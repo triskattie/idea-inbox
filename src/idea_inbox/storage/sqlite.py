@@ -6,6 +6,7 @@ import json
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
+from hashlib import sha256
 from importlib import resources
 from pathlib import Path
 
@@ -120,40 +121,50 @@ class SQLiteStorageBackend:
     def migrate(self) -> None:
         self._connection.execute(
             "CREATE TABLE IF NOT EXISTS schema_migrations "
-            "(version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)"
+            "(version TEXT PRIMARY KEY, name TEXT NOT NULL, checksum TEXT NOT NULL, "
+            "applied_at TEXT NOT NULL)"
         )
         for migration in sorted(
             resources.files(MIGRATION_PACKAGE).iterdir(), key=lambda path: path.name
         ):
             if not migration.name.endswith(".sql"):
                 continue
-            version = migration.name.removesuffix(".sql")
-            if self._migration_applied(version):
+            stem = migration.name.removesuffix(".sql")
+            version, _, name = stem.partition("_")
+            sql = migration.read_text(encoding="utf-8")
+            checksum = f"sha256:{sha256(sql.encode('utf-8')).hexdigest()}"
+            if self._migration_applied(version, name, checksum):
                 continue
-            if "fts" in version and not _has_fts5(self._connection):
+            if "fts" in name and not _has_fts5(self._connection):
                 raise SQLiteMigrationError(
                     "SQLite FTS5 is not available in this Python sqlite3 build; "
                     "install a Python/SQLite build with FTS5 enabled before "
                     "applying search migrations."
                 )
-            sql = migration.read_text(encoding="utf-8")
             try:
                 with self._connection:
                     self._connection.executescript(sql)
                     self._connection.execute(
-                        "INSERT INTO schema_migrations(version, applied_at) "
-                        "VALUES (?, datetime('now'))",
-                        (version,),
+                        "INSERT INTO schema_migrations(version, name, checksum, applied_at) "
+                        "VALUES (?, ?, ?, datetime('now'))",
+                        (version, name, checksum),
                     )
             except sqlite3.Error as exc:
-                raise SQLiteMigrationError(f"Failed to apply migration {version}: {exc}") from exc
+                raise SQLiteMigrationError(f"Failed to apply migration {stem}: {exc}") from exc
 
-    def _migration_applied(self, version: str) -> bool:
+    def _migration_applied(self, version: str, name: str, checksum: str) -> bool:
         row = self._connection.execute(
-            "SELECT 1 FROM schema_migrations WHERE version = ?",
+            "SELECT name, checksum FROM schema_migrations WHERE version = ?",
             (version,),
         ).fetchone()
-        return row is not None
+        if row is None:
+            return False
+        if row["name"] != name or row["checksum"] != checksum:
+            raise SQLiteMigrationError(
+                f"Migration {version} was already applied with different metadata; "
+                "refusing to continue."
+            )
+        return True
 
     def applied_migration_versions(self) -> list[str]:
         rows = self._connection.execute(

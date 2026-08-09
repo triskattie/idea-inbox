@@ -62,7 +62,7 @@ def test_migrations_create_authoritative_tables_and_fts_index_idempotently(stora
     tables = set(storage.table_names())
 
     assert {"schema_migrations", "raw_events", "ideas", "idea_fts"} <= tables
-    assert storage.applied_migration_versions() == ["0001_initial_storage", "0002_idea_fts"]
+    assert storage.applied_migration_versions() == ["0001", "0002"]
 
 
 def test_core_contract_modules_do_not_import_sqlite() -> None:
