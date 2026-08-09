@@ -17,9 +17,11 @@ No feature work starts without:
 - a test plan
 - clear out-of-scope boundaries
 
-## Commands
+## Baseline verification commands
 
 Install uv first if it is not already available: https://docs.astral.sh/uv/getting-started/installation/
+
+Run these checks before handing off a change.
 
 Runnable now:
 
@@ -29,6 +31,9 @@ uv run ruff check .
 uv run ruff format --check .
 uv run pytest
 ```
+
+Add feature code test-first: write the failing test before the implementation, then keep
+the baseline verification commands green.
 
 If uv is unavailable, use an isolated virtual environment instead of the system Python:
 
