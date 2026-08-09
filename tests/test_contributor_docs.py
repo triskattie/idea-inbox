@@ -79,3 +79,17 @@ def test_readme_documents_current_and_planned_cli_usage() -> None:
     assert "`uv run idea-inbox serve [--host 127.0.0.1] [--port 8080]`" in readme
     assert "Unknown commands or invalid options" in readme
     assert "Deferred direct content commands" in readme
+
+
+def test_project_documents_human_supervised_hermes_development() -> None:
+    readme = read_doc("README.md")
+    doc = read_doc("docs/development-with-hermes.md")
+
+    assert "Human-supervised Hermes Agent development" in readme
+    assert "docs/development-with-hermes.md" in readme
+    assert "mainly coded using Hermes Agent" in doc
+    assert "human supervisor" in doc
+    assert "creative director" in doc
+    assert "planning" in doc
+    assert "skills" in doc
+    assert "tool-based verification" in doc

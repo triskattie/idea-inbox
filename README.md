@@ -9,6 +9,12 @@ Self-hosted idea capture and retrieval assistant for collecting ideas from chat,
 - Stable extension points for connectors, model providers, embedding providers, credential providers, storage, and search.
 - No lock-in to OpenAI API keys: local AI, OpenAI-compatible endpoints, OAuth/proxy/Codex-style flows should be addable without rewrites.
 
+## Human-supervised Hermes Agent development
+
+Idea Inbox is a human-directed, AI-assisted project: it has been mainly coded using Hermes Agent, with Tris acting as human supervisor, creative director, product owner, and reviewer.
+
+See [Development with Hermes Agent](docs/development-with-hermes.md) for the collaboration model and the Hermes features used so far.
+
 ## Planned MVP
 
 1. Manual API idea capture.
