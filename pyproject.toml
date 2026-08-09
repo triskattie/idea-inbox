@@ -8,6 +8,9 @@ license = { text = "MIT" }
 authors = [{ name = "Tris" }]
 dependencies = []
 
+[tool.uv]
+package = true
+
 [project.scripts]
 idea-inbox = "idea_inbox.cli:main"
 

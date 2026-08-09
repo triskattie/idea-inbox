@@ -19,8 +19,8 @@ Build a lightweight self-hosted idea capture and retrieval assistant. Users can 
 2. Manual idea API.
 3. Raw event pipeline.
 4. Keyword search.
-5. Embeddings and hybrid search.
-6. Cited query endpoint.
+5. Cited query endpoint.
+6. Embeddings and hybrid search.
 7. Telegram/email/Discord connectors.
 8. Optional Postgres + pgvector deployment profile.
 

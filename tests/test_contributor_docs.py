@@ -31,3 +31,20 @@ def test_contributing_documents_uv_prerequisite_and_venv_fallback() -> None:
     assert "python3 -m venv .venv" in contributing
     assert ".venv/bin/python -m pytest" in contributing
     assert ".venv/bin/python -m ruff check ." in contributing
+
+
+def test_initial_product_spec_keeps_query_before_optional_hybrid_search() -> None:
+    initial_spec = read_doc("docs/specs/initial-product-spec.md")
+
+    assert initial_spec.index("5. Cited query endpoint.") < initial_spec.index(
+        "6. Embeddings and hybrid search."
+    )
+
+
+def test_discovery_inventory_is_marked_as_resolved_by_mvp_spec() -> None:
+    discovery = read_doc("docs/specs/mvp-discovery-inventory.md")
+
+    assert "ADR-006-mvp-scope-and-local-first-self-hosting.md" in discovery
+    assert "The open questions below were resolved by `mvp-architecture-spec.md`" in discovery
+    assert "README quick start references `uv run idea-inbox dev`" not in discovery
+    assert "ghcr.io/triskattie/idea-inbox:latest" not in discovery

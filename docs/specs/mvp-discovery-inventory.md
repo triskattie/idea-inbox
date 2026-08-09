@@ -4,6 +4,10 @@
 
 This note inventories the current Idea Inbox repository documentation and accepted decisions so a downstream worker can draft the full MVP spec without rereading the whole repo. It records repo evidence only; unresolved questions are intentionally kept separate from confirmed decisions.
 
+## Resolution status
+
+This is a source inventory snapshot, not the controlling MVP contract. The open questions below were resolved by `mvp-architecture-spec.md`; keep this file only as background evidence for how the MVP architecture spec was derived.
+
 ## Sources reviewed
 
 - `README.md` — product summary, goals, planned MVP, quick start.
@@ -16,7 +20,7 @@ This note inventories the current Idea Inbox repository documentation and accept
 - `docs/connectors.md` — connector contract and planned connector list.
 - `docs/providers.md` — model, embedding, and credential provider assumptions.
 - `docs/self-hosting.md` — lightweight and production deployment targets.
-- `docs/decisions/ADR-001-connector-and-provider-boundaries.md` through `ADR-005-raw-events-derived-ideas.md` — accepted architectural decisions.
+- `docs/decisions/ADR-001-connector-and-provider-boundaries.md` through `ADR-006-mvp-scope-and-local-first-self-hosting.md` — accepted architectural decisions.
 - `CHANGELOG.md` — current repository status note.
 - `src/idea_inbox/cli.py`, `src/idea_inbox/__init__.py`, and `tests/test_package_baseline.py` — implementation status check.
 
@@ -80,8 +84,8 @@ The most complete phase list is in the initial product spec:
 2. Manual idea API.
 3. Raw event pipeline.
 4. Keyword search.
-5. Embeddings and hybrid search.
-6. Cited query endpoint.
+5. Cited query endpoint.
+6. Embeddings and hybrid search.
 7. Telegram/email/Discord connectors.
 8. Optional Postgres + pgvector deployment profile.
 
@@ -96,34 +100,34 @@ Evidence: `docs/specs/initial-product-spec.md` lines 16-25. The README planned M
 
 Evidence: `docs/specs/initial-product-spec.md` lines 27-32 and `docs/connectors.md` lines 22-24.
 
-## Open questions and inconsistencies for the full MVP spec
+## Inventory questions and MVP spec resolutions
 
-1. API surface details are not yet specified.
-   - Standards require `/v1` REST endpoints, Pydantic schemas, pagination for lists, and a consistent error shape, but exact endpoint names, request/response bodies, idempotency semantics, and status codes for manual capture/query are not yet defined. Evidence: `CONTRIBUTING.md` lines 70-88.
+1. API surface details needed specification.
+   - Resolved by `mvp-architecture-spec.md`: manual capture uses `POST /v1/ideas`, generic connector ingestion uses `POST /v1/connectors/{connector_name}/events`, search uses `GET /v1/ideas/search`, query uses `POST /v1/query`, and responses follow `/v1`, pagination, citation, idempotency, and standard error-shape requirements.
 
-2. Raw event and idea schema details are not yet specified.
-   - The docs define `RawEvent`, `IdeaDraft`, and `Idea` conceptually, but not required fields, identifiers, timestamps, source metadata shape, dedupe keys, reprocessing state, or migration strategy. Evidence: `docs/architecture.md` lines 11-21 and `docs/decisions/ADR-005-raw-events-derived-ideas.md` lines 10-18.
+2. Raw event and idea schema details needed specification.
+   - Resolved by `mvp-architecture-spec.md`: required `RawEvent`, `IdeaDraft`, `Idea`, `SearchHit`, and `Citation` fields are named, raw events remain the source lineage record, and SQLite migrations are required for deterministic local storage.
 
-3. Search backend sequencing needs reconciliation.
-   - The initial spec phases say keyword search first, then embeddings/hybrid search; the README planned MVP says SQLite default storage and full-text search plus provider interfaces before cited query. The full spec should make explicit whether citations are supported initially by keyword/FTS only, hybrid search, or both. Evidence: `docs/specs/initial-product-spec.md` lines 16-25 and `README.md` lines 12-20.
+3. Search backend sequencing needed reconciliation.
+   - Resolved by `mvp-architecture-spec.md`: keyword/FTS search and cited query behavior come before optional embeddings/hybrid search, so citations are supported initially by stored ideas retrieved through SQLite FTS.
 
-4. Provider interface contracts are not defined yet.
-   - Existing docs list provider categories and future credential paths, but there is no protocol/API for model generation, embeddings, credential lookup, streaming, retries, rate limits, or deterministic test doubles. Evidence: `docs/providers.md` lines 5-30 and `docs/decisions/ADR-004-credential-providers.md` lines 10-17.
+4. Provider interface contracts needed definition.
+   - Resolved for MVP planning by `mvp-architecture-spec.md`: `ModelProvider`, `EmbeddingProvider`, and `CredentialProvider` protocol shapes are named, mocks are required for tests, and retries/timeouts/configuration remain explicit adapter concerns.
 
-5. Connector authentication and verification behavior is unclear.
-   - `.env.example` includes connector secrets, but the docs do not yet specify webhook signature verification, manual API key handling, Telegram/Discord event validation, email polling cadence, duplicate handling, or retry behavior. Evidence: `.env.example` lines 14-20 and `docs/connectors.md` lines 5-24.
+5. Connector authentication and verification behavior needed clarification.
+   - Resolved for MVP planning by `mvp-architecture-spec.md`: connector modules validate payloads at the boundary, preserve provider IDs, use connector-specific credential providers, keep retries/polling configurable, and start fixture-driven before real platform calls.
 
-6. Storage abstraction scope needs a first-slice boundary.
-   - SQLite and Postgres are both planned, but the MVP spec should decide whether the first implementation abstracts storage immediately or keeps a SQLite implementation behind an interface with Postgres tests deferred until the production profile lands. Evidence: `docs/decisions/ADR-002-sqlite-default-postgres-production.md` lines 10-18.
+6. Storage abstraction scope needed a first-slice boundary.
+   - Resolved by `mvp-architecture-spec.md`: SQLite is the first concrete storage/search path behind `StorageBackend` and `SearchIndex`; Postgres + pgvector stays optional after SQLite is healthy, with opt-in integration tests.
 
 7. Self-hosting commands are aspirational until implementation exists.
-   - README quick start references `uv run idea-inbox dev`, while the current console script points at `idea_inbox.cli:main` and the implementation only prints `implementation pending`. The full MVP spec should define the real `dev` command behavior or adjust quick start once the CLI shape is chosen. Evidence: `README.md` lines 31-39, `pyproject.toml` lines 11-13, and `src/idea_inbox/cli.py` lines 1-2.
+   - Resolved by `mvp-architecture-spec.md` and current README/self-hosting docs: the current smoke command is `uv run idea-inbox`; planned commands such as `idea-inbox dev`, `idea-inbox migrate`, and `idea-inbox serve` must stay labeled as target commands until implemented and tested.
 
-8. Docs mention Docker image and Compose paths before files exist.
-   - Self-hosting docs reference `ghcr.io/triskattie/idea-inbox:latest` and `docker compose up -d`, but no Dockerfile or Compose file was found in the current repository inventory. Evidence: `docs/self-hosting.md` lines 9-19 and repository file inventory from this task.
+8. Docs mention Docker and Compose as planned production paths before files exist.
+   - Resolved by `mvp-architecture-spec.md` and current README/self-hosting docs: Docker and Compose remain planned deployment targets only until the repository includes matching assets such as a Dockerfile, Compose file, and/or confirmed published image.
 
-9. Multi-user and permission boundaries are intentionally deferred, but data model choices may still need future-proofing.
-   - Multi-user permissions are out of scope, but the MVP spec should decide whether single-user records include owner/user fields now or explicitly defer them to avoid accidental multi-user claims. Evidence: `docs/specs/initial-product-spec.md` lines 27-32.
+9. Multi-user and permission boundaries needed explicit deferral.
+   - Resolved by `mvp-architecture-spec.md` and ADR-006: multi-user ownership is out of scope; any future-proof fields must be nullable metadata or single-operator placeholders, not implicit security boundaries.
 
 ## Recommended handoff focus for the full MVP spec worker
 
