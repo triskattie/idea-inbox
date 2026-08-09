@@ -42,6 +42,53 @@ This repository is still being initialized, so the current command only verifies
 providers by default; it does not require hosted-model credentials, hidden outbound model
 calls, or telemetry.
 
+## CLI usage
+
+### Smoke command
+
+```bash
+uv run idea-inbox
+```
+
+Run this from the repository root after `uv sync`. It prints top-level CLI help and exits `0`.
+It does not start an API server, create or migrate a database, call model providers, open
+network listeners, or emit telemetry.
+
+### Startup commands
+
+The CLI now parses the planned startup commands, but the API, storage migration, and server
+runtime modules are still pending. Until those modules exist, startup commands validate their
+arguments and then fail with actionable not-implemented messages.
+
+| Command | Purpose | Current behavior |
+| --- | --- | --- |
+| `uv run idea-inbox dev [--host 127.0.0.1] [--port 8080]` | Start the local development API using SQLite and mock/local providers by default. | Parses options, then exits `1` because API startup is not implemented yet. |
+| `uv run idea-inbox migrate` | Apply deterministic storage migrations for the configured backend. | Parses the command, then exits `1` because migrations are not implemented yet. |
+| `uv run idea-inbox serve [--host 127.0.0.1] [--port 8080]` | Start the configured `/v1` API for local or self-hosted use. | Parses options, then exits `1` because API server startup is not implemented yet. |
+
+Help and validation:
+
+```bash
+uv run idea-inbox --help
+uv run idea-inbox dev --help
+uv run idea-inbox migrate --help
+uv run idea-inbox serve --help
+```
+
+Help commands exit `0`. Unknown commands or invalid options, such as an invalid `--port`, print
+usage plus an error and exit `2`.
+
+Deferred direct content commands: `idea-inbox capture`, `idea-inbox search`, and
+`idea-inbox query` are intentionally not part of the first CLI surface. The planned MVP exposes
+capture, search, and cited query behavior through `/v1` HTTP API endpoints first.
+
+Troubleshooting:
+
+- `uv: command not found`: install uv from the official installer, or use the virtualenv
+  fallback in [Contributing](CONTRIBUTING.md).
+- A not-implemented message from `dev`, `migrate`, or `serve` means the parser accepted the
+  command but the underlying runtime module is not built yet.
+
 Planned self-hosting targets are documented in [Self-hosting](docs/self-hosting.md). Docker
 and Docker Compose support are planned deployment targets, but this repository does not yet
 include a Dockerfile, Compose file, or confirmed published image.

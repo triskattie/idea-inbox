@@ -9,10 +9,11 @@ def read_doc(relative_path: str) -> str:
 
 def test_readme_quick_start_uses_current_smoke_command_not_planned_dev_command() -> None:
     readme = read_doc("README.md")
+    quick_start = readme.split("## Quick start", 1)[1].split("## CLI usage", 1)[0]
 
-    assert "uv run idea-inbox\n" in readme
-    assert "uv run idea-inbox dev" not in readme
-    assert "only verifies that the package and CLI entry point run" in readme
+    assert "uv run idea-inbox\n" in quick_start
+    assert "uv run idea-inbox dev" not in quick_start
+    assert "only verifies that the package and CLI entry point run" in quick_start
 
 
 def test_contributing_separates_runnable_commands_from_planned_type_checking() -> None:
@@ -62,3 +63,19 @@ def test_mvp_architecture_spec_defines_planned_cli_contract() -> None:
         "Direct `idea-inbox capture`, `idea-inbox search`, "
         "or `idea-inbox query` commands are deferred" in mvp_spec
     )
+
+
+def test_readme_documents_current_and_planned_cli_usage() -> None:
+    readme = read_doc("README.md")
+
+    assert "## CLI usage" in readme
+    assert "### Smoke command" in readme
+    assert "uv run idea-inbox\n" in readme
+    assert "prints top-level CLI help and exits `0`" in readme
+    assert "### Startup commands" in readme
+    assert "startup commands validate their\narguments" in readme
+    assert "`uv run idea-inbox dev [--host 127.0.0.1] [--port 8080]`" in readme
+    assert "`uv run idea-inbox migrate`" in readme
+    assert "`uv run idea-inbox serve [--host 127.0.0.1] [--port 8080]`" in readme
+    assert "Unknown commands or invalid options" in readme
+    assert "Deferred direct content commands" in readme
