@@ -48,3 +48,17 @@ def test_discovery_inventory_is_marked_as_resolved_by_mvp_spec() -> None:
     assert "The open questions below were resolved by `mvp-architecture-spec.md`" in discovery
     assert "README quick start references `uv run idea-inbox dev`" not in discovery
     assert "ghcr.io/triskattie/idea-inbox:latest" not in discovery
+
+
+def test_mvp_architecture_spec_defines_planned_cli_contract() -> None:
+    mvp_spec = read_doc("docs/specs/mvp-architecture-spec.md")
+
+    assert "### Planned CLI command contract" in mvp_spec
+    assert "`idea-inbox dev`" in mvp_spec
+    assert "`idea-inbox migrate`" in mvp_spec
+    assert "`idea-inbox serve --host 127.0.0.1 --port 8080`" in mvp_spec
+    assert "Unknown commands or invalid options" in mvp_spec
+    assert (
+        "Direct `idea-inbox capture`, `idea-inbox search`, "
+        "or `idea-inbox query` commands are deferred" in mvp_spec
+    )

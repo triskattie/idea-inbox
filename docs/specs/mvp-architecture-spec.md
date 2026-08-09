@@ -569,6 +569,61 @@ idea-inbox serve --host 127.0.0.1 --port 8080
 
 These are target MVP commands. They are not current quick-start commands until Phase 1 implements command parsing and tests the behavior. Documentation that describes current setup should continue to use the existing smoke command and explicitly label `dev`, `migrate`, and `serve` as planned until they are implemented.
 
+### Planned CLI command contract
+
+The CLI is an operator/developer control surface for running the local service and managing
+storage. Idea capture, search, and cited query behavior are exposed first through the `/v1`
+HTTP API, not through direct content-management CLI commands.
+
+Common behavior:
+
+- `idea-inbox --help` prints the available commands and exits `0`.
+- `idea-inbox <command> --help` prints command-specific options and exits `0`.
+- Unknown commands or invalid options print a short usage error and exit `2`.
+- Missing configuration, unavailable ports, failed migrations, or startup failures print an
+  actionable error without secrets and exit `1`.
+- Successful one-shot commands exit `0`; long-running server commands exit `0` on graceful
+  shutdown and `1` on startup/runtime failure.
+
+`idea-inbox dev`
+
+- Purpose: start the local development API using SQLite and mock/local providers by default.
+- Options: `--host` and `--port` may override the default bind address and port; database URL
+  and log level are read from the same configuration surface used by the server.
+- Behavior: loads development configuration, ensures the SQLite database is ready, starts the
+  `/v1` API, and clearly reports the local URL. It must not require hosted-model credentials,
+  hidden outbound model calls, or telemetry.
+- Conservative assumption: dev startup may apply pending SQLite migrations automatically because
+  SQLite dev mode must stay healthy; if that proves unsafe, implementation should require an
+  explicit `idea-inbox migrate` run and document the reason.
+
+`idea-inbox migrate`
+
+- Purpose: apply deterministic repository migrations for the configured storage backend.
+- Options: database URL/path may be provided through configuration; a future `--check` option may
+  report pending migrations without applying them if migration metadata needs it.
+- Behavior: applies pending migrations idempotently, prints the resulting migration state, and
+  exits `0` when the database is current. Migration failures exit `1` without partially hiding the
+  failed migration name/version.
+
+`idea-inbox serve --host 127.0.0.1 --port 8080`
+
+- Purpose: start the configured API process for local or self-hosted use.
+- Options: `--host` and `--port` set the bind address. Provider, credential, database, connector,
+  and log-level settings come from configuration rather than ad hoc command-line secrets.
+- Behavior: validates required configuration before accepting requests, starts the `/v1` API, and
+  refuses unsafe network exposure when required operator credentials are missing. Hosted model
+  providers remain optional and must be visible in configuration.
+
+Intentionally deferred CLI commands:
+
+- Direct `idea-inbox capture`, `idea-inbox search`, or `idea-inbox query` commands are deferred;
+  the first MVP contract uses `POST /v1/ideas`, `GET /v1/ideas/search`, and `POST /v1/query`.
+- Connector worker commands such as `telegram poll`, `email poll`, or `discord listen` are deferred
+  until connector runtime modes, credentials, retries, and fixture-driven tests are specified.
+- Admin/export/import, provider login, OAuth/device authorization, backup/restore, retention, and
+  redaction commands are deferred until their storage, privacy, and credential contracts exist.
+
 Configuration should cover:
 
 - SQLite database URL/path.
