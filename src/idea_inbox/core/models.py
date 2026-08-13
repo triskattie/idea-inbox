@@ -34,12 +34,13 @@ class RawEvent:
 
 @dataclass(frozen=True)
 class IdeaDraft:
+    id: str
     raw_event_id: str
     text: str
     source_created_at: str | None = None
-    source_ref: str | None = None
+    source_uri: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
-    tags: tuple[str, ...] = ()
+    extraction_state: str = "pending"
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,7 @@ class Idea:
     metadata: dict[str, Any] = field(default_factory=dict)
     tags: tuple[str, ...] = ()
     embedding_state: str = "not_requested"
+    draft_id: str | None = None
 
 
 @dataclass(frozen=True)

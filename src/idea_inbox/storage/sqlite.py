@@ -11,7 +11,7 @@ from importlib import resources
 from pathlib import Path
 
 from idea_inbox.config import AppConfig
-from idea_inbox.core.models import Idea, RawEvent
+from idea_inbox.core.models import Idea, IdeaDraft, RawEvent
 
 MIGRATION_PACKAGE = "idea_inbox.storage.migrations"
 
@@ -79,10 +79,23 @@ def _raw_event_from_row(row: sqlite3.Row) -> RawEvent:
     )
 
 
+def _idea_draft_from_row(row: sqlite3.Row) -> IdeaDraft:
+    return IdeaDraft(
+        id=row["id"],
+        raw_event_id=row["raw_event_id"],
+        text=row["text"],
+        source_created_at=row["source_created_at"],
+        source_uri=row["source_uri"],
+        metadata=json.loads(row["metadata"]),
+        extraction_state=row["extraction_state"],
+    )
+
+
 def _idea_from_row(row: sqlite3.Row) -> Idea:
     return Idea(
         id=row["id"],
         raw_event_id=row["raw_event_id"],
+        draft_id=row["draft_id"],
         text=row["text"],
         source=row["source"],
         source_ref=row["source_ref"],
@@ -221,16 +234,117 @@ class SQLiteStorageBackend:
         row = self._connection.execute("SELECT COUNT(*) AS total FROM raw_events").fetchone()
         return int(row["total"])
 
+    def list_raw_events(
+        self, *, processing_state: str | None = None, limit: int = 50, offset: int = 0
+    ) -> list[RawEvent]:
+        where_clause = ""
+        parameters: list[object] = []
+        if processing_state is not None:
+            where_clause = "WHERE processing_state = ?"
+            parameters.append(processing_state)
+        parameters.extend([limit, offset])
+        rows = self._connection.execute(
+            f"""
+            SELECT * FROM raw_events
+            {where_clause}
+            ORDER BY received_at DESC, id ASC
+            LIMIT ? OFFSET ?
+            """,
+            tuple(parameters),
+        ).fetchall()
+        return [_raw_event_from_row(row) for row in rows]
+
+    def update_raw_event_processing_state(
+        self,
+        raw_event_id: str,
+        processing_state: str,
+        *,
+        error_code: str | None = None,
+        error_message: str | None = None,
+    ) -> RawEvent | None:
+        with self._connection:
+            self._connection.execute(
+                """
+                UPDATE raw_events
+                SET processing_state = ?,
+                    error_code = ?,
+                    error_message = ?,
+                    updated_at = datetime('now')
+                WHERE id = ?
+                """,
+                (processing_state, error_code, error_message, raw_event_id),
+            )
+        return self.get_raw_event(raw_event_id)
+
+    def save_idea_draft(self, idea_draft: IdeaDraft) -> IdeaDraft:
+        with self._connection:
+            self._connection.execute(
+                """
+                INSERT INTO idea_drafts (
+                  id, raw_event_id, text, source_created_at, source_uri, metadata, extraction_state
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  raw_event_id = excluded.raw_event_id,
+                  text = excluded.text,
+                  source_created_at = excluded.source_created_at,
+                  source_uri = excluded.source_uri,
+                  metadata = excluded.metadata,
+                  extraction_state = excluded.extraction_state,
+                  updated_at = datetime('now')
+                """,
+                (
+                    idea_draft.id,
+                    idea_draft.raw_event_id,
+                    idea_draft.text,
+                    idea_draft.source_created_at,
+                    idea_draft.source_uri,
+                    json.dumps(idea_draft.metadata, sort_keys=True),
+                    idea_draft.extraction_state,
+                ),
+            )
+        stored = self.get_idea_draft(idea_draft.id)
+        if stored is None:
+            raise SQLiteMigrationError("idea draft write did not persist a readable record")
+        return stored
+
+    def get_idea_draft(self, idea_draft_id: str) -> IdeaDraft | None:
+        row = self._connection.execute(
+            "SELECT * FROM idea_drafts WHERE id = ?",
+            (idea_draft_id,),
+        ).fetchone()
+        return None if row is None else _idea_draft_from_row(row)
+
+    def list_idea_drafts(
+        self, *, raw_event_id: str | None = None, limit: int = 50, offset: int = 0
+    ) -> list[IdeaDraft]:
+        where_clause = ""
+        parameters: list[object] = []
+        if raw_event_id is not None:
+            where_clause = "WHERE raw_event_id = ?"
+            parameters.append(raw_event_id)
+        parameters.extend([limit, offset])
+        rows = self._connection.execute(
+            f"""
+            SELECT * FROM idea_drafts
+            {where_clause}
+            ORDER BY created_at ASC, id ASC
+            LIMIT ? OFFSET ?
+            """,
+            tuple(parameters),
+        ).fetchall()
+        return [_idea_draft_from_row(row) for row in rows]
+
     def save_idea(self, idea: Idea) -> Idea:
         with self._connection:
             self._connection.execute(
                 """
                 INSERT INTO ideas (
-                  id, raw_event_id, text, source, source_ref, captured_at, created_at,
+                  id, raw_event_id, draft_id, text, source, source_ref, captured_at, created_at,
                   updated_at, metadata, tags, embedding_state
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(id) DO UPDATE SET
                   raw_event_id = excluded.raw_event_id,
+                  draft_id = excluded.draft_id,
                   text = excluded.text,
                   source = excluded.source,
                   source_ref = excluded.source_ref,
@@ -244,6 +358,7 @@ class SQLiteStorageBackend:
                 (
                     idea.id,
                     idea.raw_event_id,
+                    idea.draft_id,
                     idea.text,
                     idea.source,
                     idea.source_ref,
@@ -254,6 +369,11 @@ class SQLiteStorageBackend:
                     _tags_to_storage(idea.tags),
                     idea.embedding_state,
                 ),
+            )
+            self._connection.execute("DELETE FROM idea_tags WHERE idea_id = ?", (idea.id,))
+            self._connection.executemany(
+                "INSERT INTO idea_tags (idea_id, tag) VALUES (?, ?)",
+                [(idea.id, tag) for tag in _tags_from_storage(_tags_to_storage(idea.tags))],
             )
         stored = self.get_idea(idea.id)
         if stored is None:
@@ -266,6 +386,18 @@ class SQLiteStorageBackend:
             (idea_id,),
         ).fetchone()
         return None if row is None else _idea_from_row(row)
+
+    def list_ideas(self, *, limit: int = 50, offset: int = 0) -> list[Idea]:
+        rows = self._connection.execute(
+            """
+            SELECT * FROM ideas
+            WHERE deleted_at IS NULL
+            ORDER BY captured_at DESC, id ASC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset),
+        ).fetchall()
+        return [_idea_from_row(row) for row in rows]
 
     def delete_idea(self, idea_id: str) -> None:
         with self._connection:
