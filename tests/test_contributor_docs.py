@@ -75,10 +75,47 @@ def test_readme_documents_current_and_planned_cli_usage() -> None:
     assert "### Startup commands" in readme
     assert "startup commands validate their\narguments" in readme
     assert "`uv run idea-inbox dev [--host 127.0.0.1] [--port 8080]`" in readme
-    assert "`uv run idea-inbox migrate`" in readme
+    assert "`uv run idea-inbox migrate [--database ./data/idea-inbox.sqlite3]`" in readme
     assert "`uv run idea-inbox serve [--host 127.0.0.1] [--port 8080]`" in readme
     assert "Unknown commands or invalid options" in readme
     assert "Deferred direct content commands" in readme
+
+
+def test_docs_describe_implemented_fts_search_behavior() -> None:
+    readme = read_doc("README.md")
+    architecture = read_doc("docs/architecture.md")
+    self_hosting = read_doc("docs/self-hosting.md")
+    sqlite_plan = read_doc("docs/specs/sqlite-schema-plan.md")
+    mvp_spec = read_doc("docs/specs/mvp-architecture-spec.md")
+    contributing = read_doc("CONTRIBUTING.md")
+
+    assert "## FTS-backed search" in readme
+    assert (
+        "Searchable fields are canonical `Idea.text`, normalized idea tags, and `Idea.source_ref`"
+        in readme
+    )
+    assert "Raw event payloads are deliberately not indexed or returned" in readme
+    assert "SQLite FTS operators such as `OR`, prefix `*`, column filters, and `NEAR`" in readme
+    assert "`limit` defaults to `10`" in readme
+
+    assert "## Current search projection" in architecture
+    assert "`idea_fts` virtual table over canonical idea text" in architecture
+    assert "Raw event payloads are preserved for audit" in architecture
+
+    assert "## Current SQLite migrations and search index" in self_hosting
+    assert "The Python `sqlite3` build must include SQLite FTS5" in self_hosting
+    assert "SQLiteFTSSearchIndex(storage).rebuild()" in self_hosting
+
+    assert "## Implemented FTS search behavior" in sqlite_plan
+    assert "`bm25(idea_fts)`" in sqlite_plan
+    assert "Raw SQLite FTS syntax is not exposed" in sqlite_plan
+
+    assert "Implemented behavior as of the FTS search slice" in mvp_spec
+    assert "Searchable fields are `Idea.text`, normalized tags, and `Idea.source_ref`" in mvp_spec
+    assert "`next_cursor` is currently always `null`" in mvp_spec
+
+    assert "### SQLite FTS search maintenance" in contributing
+    assert "preserving the\n`ideas_ai`, `ideas_au`, and `ideas_ad` triggers" in contributing
 
 
 def test_project_documents_human_supervised_hermes_development() -> None:

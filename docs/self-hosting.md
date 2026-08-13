@@ -19,6 +19,32 @@ hosted-model credentials, hidden outbound model calls, or telemetry. Hosted mode
 may be configured explicitly later, but they are optional accelerators rather than a
 requirement for local development.
 
+## Current SQLite migrations and search index
+
+SQLite is the current runnable persistence path. Apply migrations with:
+
+```bash
+uv run idea-inbox migrate
+```
+
+Use `uv run idea-inbox migrate --database ./path/to/ideas.sqlite3` to migrate a specific
+database file instead of the configured `IDEA_INBOX_DATABASE_URL` / `IDEA_INBOX_SQLITE_PATH`.
+Migration `0002_idea_fts.sql` creates the `idea_fts` SQLite FTS5 projection over canonical
+ideas and finishes with an FTS rebuild so existing `ideas` rows become searchable.
+
+Operational notes:
+
+- The Python `sqlite3` build must include SQLite FTS5. If it does not, migration fails before
+  applying the FTS migration with `SQLite FTS5 is not available in this Python sqlite3 build`.
+- `idea_fts` is a derived projection, not the authoritative store. It can be rebuilt from the
+  `ideas` table with `SQLiteFTSSearchIndex(storage).rebuild()` if the projection is cleared or
+  suspected stale.
+- The projection is kept synchronized by SQLite triggers on `ideas` insert, update, and delete.
+  Raw events remain stored even when a derived idea is deleted.
+- Search currently runs through the importable WSGI app at `GET /v1/ideas/search?q=...&limit=10`.
+  The CLI `serve` command still parses options but does not start an HTTP server yet, so
+  deployment packaging still needs a server entrypoint around `idea_inbox.api.create_app`.
+
 ## Planned lightweight self-hosting
 
 The intended lightweight self-host path is SQLite, the built-in API, and mock or local

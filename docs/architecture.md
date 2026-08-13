@@ -29,6 +29,18 @@ The ingestion order is mandatory: raw provider input is stored as `RawEvent` bef
 - Generated answers cite persisted `Idea` records, and those citations must remain traceable to the raw source event and provider/source IDs used to derive the idea.
 - Credential lifecycle belongs behind `CredentialProvider`; model and embedding providers do not own secret storage, OAuth refresh, proxy login, or local login persistence.
 
+## Current search projection
+
+The first implemented search adapter is SQLite FTS5. Migration `0002_idea_fts.sql` creates an
+`idea_fts` virtual table over canonical idea text, normalized tags, and `source_ref`, backed by
+the `ideas` table with `content='ideas'` and synchronized by insert/update/delete triggers.
+Raw event payloads are preserved for audit and reprocessing, but they are not indexed by the
+current search projection.
+
+`GET /v1/ideas/search` returns stable idea IDs, snippets, scores, source, and capture time from
+the joined `ideas` row. Query answers must continue to resolve search hits back through stored
+ideas before presenting citations.
+
 ## Design priorities
 
 1. Lightweight default deployment.

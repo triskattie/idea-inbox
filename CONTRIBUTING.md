@@ -70,6 +70,18 @@ Rules:
 - No hidden network calls in constructors.
 - No secrets in logs.
 
+### SQLite FTS search maintenance
+
+The current SQLite search index is `idea_fts`, a rebuildable FTS5 projection over canonical
+`Idea.text`, normalized tags, and `Idea.source_ref`. Keep it synchronized by preserving the
+`ideas_ai`, `ideas_au`, and `ideas_ad` triggers in `0002_idea_fts.sql` when changing idea
+fields or write paths. If a new idea field should become searchable, update the migration or
+add a new migration, update `SQLiteFTSSearchIndex.search()` only if ranking/filtering changes,
+and add tests proving insert, update, delete, rebuild, and raw-payload non-indexing behavior.
+
+Do not index `raw_events.payload` directly. Raw events are the authoritative audit trail;
+search and cited answers must resolve through stored `ideas` and stable idea IDs.
+
 ## Testing standards
 
 Strict TDD for behavior changes:

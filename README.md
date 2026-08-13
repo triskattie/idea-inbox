@@ -52,6 +52,44 @@ SQLite configuration now defaults to `sqlite:///./data/idea-inbox.sqlite3` relat
 project root. Override the database location with `IDEA_INBOX_DATABASE_URL` or
 `IDEA_INBOX_SQLITE_PATH`, but not both.
 
+## FTS-backed search
+
+The first search slice is available through the importable WSGI app as:
+
+```text
+GET /v1/ideas/search?q=local%20AI&limit=10
+```
+
+Search runs against the configured SQLite database after migrations have created the
+`idea_fts` FTS5 projection. The current response shape is:
+
+```json
+{
+  "items": [
+    {
+      "idea_id": "idea_...",
+      "snippet": "<mark>local</mark> AI idea",
+      "score": -1.23,
+      "source": "manual",
+      "captured_at": "2026-08-09T00:00:00Z"
+    }
+  ],
+  "page": { "limit": 10, "next_cursor": null }
+}
+```
+
+Searchable fields are canonical `Idea.text`, normalized idea tags, and `Idea.source_ref`.
+Raw event payloads are deliberately not indexed or returned. Queries are tokenized into
+Unicode word tokens, punctuation is ignored, and each token is quoted before it is passed to
+SQLite FTS. This makes simple keyword searches safe and deterministic, but it also means raw
+SQLite FTS operators such as `OR`, prefix `*`, column filters, and `NEAR` are not exposed yet.
+Blank or punctuation-only `q` values return `400 VALIDATION_ERROR`. `limit` defaults to `10`
+and must be between `1` and `50`.
+
+Results are ordered by SQLite `bm25(idea_fts)` score, then newest `captured_at`, then stable
+idea id. Snippets highlight matches from idea text with `<mark>...</mark>`. The endpoint does
+not expose raw idea text or raw payload bodies in the response.
+
 ## CLI usage
 
 ### Smoke command
@@ -73,7 +111,7 @@ arguments and then fail with actionable not-implemented messages.
 | Command | Purpose | Current behavior |
 | --- | --- | --- |
 | `uv run idea-inbox dev [--host 127.0.0.1] [--port 8080]` | Start the local development API using SQLite and mock/local providers by default. | Parses options, then exits `1` because API startup is not implemented yet. |
-| `uv run idea-inbox migrate` | Apply deterministic storage migrations for the configured backend. | Parses the command, then exits `1` because migrations are not implemented yet. |
+| `uv run idea-inbox migrate [--database ./data/idea-inbox.sqlite3]` | Apply deterministic SQLite storage migrations, including the FTS5 projection. | Applies migrations and exits `0`; exits `1` with an actionable error if configuration is invalid, SQLite FTS5 is unavailable, or a migration fails. |
 | `uv run idea-inbox serve [--host 127.0.0.1] [--port 8080]` | Start the configured `/v1` API for local or self-hosted use. | Parses options, then exits `1` because API server startup is not implemented yet. |
 
 Help and validation:

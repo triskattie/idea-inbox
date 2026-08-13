@@ -127,9 +127,17 @@ Core code may depend on protocols and plain domain data types only. Adapter modu
 
 ### Current implementation baseline
 
-The current repository is an executable skeleton, not an API implementation. As of this spec review, `pyproject.toml` exposes the `idea-inbox` console script at `idea_inbox.cli:main`, `src/idea_inbox/cli.py` parses the planned `dev`, `migrate`, and `serve` commands, and the only package code present is `cli.py` plus package metadata in `__init__.py`.
+The repository now has first-pass configuration, SQLite storage, migrations, a SQLite FTS
+search adapter, and an importable WSGI API app for the search endpoint. `pyproject.toml`
+exposes the `idea-inbox` console script at `idea_inbox.cli:main`; `src/idea_inbox/cli.py`
+parses `dev`, `migrate`, and `serve`; and `idea-inbox migrate` applies deterministic SQLite
+migrations for the configured database or an explicit `--database` path.
 
-The directory layout above is therefore the target implementation boundary, not an existing package map. Phase 1 must connect the CLI command surface to first source directories before later cards add API, storage, search, connector, or provider behavior. Until those runtime targets exist, user-facing docs should keep distinguishing the current smoke command (`uv run idea-inbox`) from startup commands such as `idea-inbox dev` or `idea-inbox serve`, which currently parse options and fail with actionable not-implemented errors.
+The `dev` and `serve` commands still parse options and fail with actionable not-implemented
+errors because the HTTP server runtime is not wired yet. User-facing docs should continue to
+distinguish the current smoke command (`uv run idea-inbox`), the runnable migration command,
+the importable WSGI app surface, and startup commands such as `idea-inbox dev` or
+`idea-inbox serve` that are still server-entrypoint placeholders.
 
 ## Core domain concepts and interfaces
 
@@ -373,6 +381,23 @@ Response:
 }
 ```
 
+Implemented behavior as of the FTS search slice:
+
+- The endpoint is available from `idea_inbox.api.create_app` and reads the configured SQLite
+  database path unless an explicit `database_path` is injected for tests.
+- `q` is required after normalization. The search adapter extracts Unicode word tokens,
+  ignores punctuation, quotes every token, and passes the normalized string to SQLite FTS.
+- Searchable fields are `Idea.text`, normalized tags, and `Idea.source_ref`. Raw event
+  payloads are preserved in storage but are not indexed by `idea_fts` and are not returned by
+  this response.
+- Raw SQLite FTS query syntax is intentionally not exposed yet; boolean operators, prefix
+  wildcards, `NEAR`, column filters, and caller-supplied quotes are treated as words or
+  punctuation by the normalizer.
+- `limit` defaults to `10` and must be from `1` through `50`; invalid limits and empty queries
+  use the standard `400 VALIDATION_ERROR` response shape.
+- Results are ordered by `bm25(idea_fts)`, then newest capture timestamp, then stable idea id.
+  `next_cursor` is currently always `null`.
+
 ### Query with cited answer
 
 ```text
@@ -454,8 +479,12 @@ Required SQLite tables:
 
 `idea_fts`
 
-- SQLite FTS virtual table over idea text and selected metadata.
-- Kept in sync when ideas are inserted or updated.
+- SQLite FTS5 virtual table over canonical idea `text`, normalized `tags`, and `source_ref`,
+  with `content='ideas'` and `content_rowid='rowid'` so results join back to stable
+  `ideas.id` values.
+- Kept in sync by SQLite triggers when ideas are inserted, updated, or deleted. The migration
+  ends with an FTS rebuild for existing rows, and the search adapter exposes a rebuild method
+  for projection repair.
 
 `embeddings`
 

@@ -2,7 +2,9 @@
 
 ## Status
 
-Planning note for the first SQLite storage foundation. This document narrows the storage design in `mvp-architecture-spec.md` into concrete tables and migration ordering before implementation.
+Partially implemented planning note for the first SQLite storage foundation. This document
+narrows the storage design in `mvp-architecture-spec.md` into concrete tables and migration
+ordering, and records the current implemented FTS-backed search behavior.
 
 ## Source context
 
@@ -82,11 +84,35 @@ Normalized tag/filter projection for canonical ideas.
 
 SQLite FTS virtual table for keyword search over canonical ideas.
 
-- Primary key: use the FTS rowid mapped to the canonical `ideas` row or an unindexed `idea_id` column, depending on the SQLite FTS implementation chosen during storage work.
-- Columns: `text`, `source`, `tags`, and/or `metadata_text` as indexed content, plus an unindexed stable idea reference when needed.
-- Indexes: FTS tables own their search index; the implementation should keep an ordinary lookup path back to `ideas.id`.
+- Implemented shape: `CREATE VIRTUAL TABLE idea_fts USING fts5(text, tags, source_ref, content='ideas', content_rowid='rowid', tokenize='unicode61')`.
+- Primary key mapping: `idea_fts.rowid` maps to `ideas.rowid`; search results join back to `ideas` to return stable `ideas.id` values.
+- Indexed fields: canonical `ideas.text`, normalized space-separated `ideas.tags`, and `ideas.source_ref`. Raw event payloads, metadata JSON, source names, timestamps, and IDs are not indexed by the current FTS projection.
+- Indexes: FTS owns its search index; ordinary query evidence still resolves through the joined `ideas` row.
 - Timestamps: no authoritative timestamps; all time data remains in `ideas` and is joined/resolved from storage.
-- Mapping: `SearchIndex.upsert_idea(idea)` writes this derived projection from `ideas`, not from raw events. It can be rebuilt from `ideas` at any time and must not become the only store for idea text or citation lineage.
+- Synchronization: migration `0002_idea_fts.sql` creates insert/update/delete triggers on `ideas` and ends with `INSERT INTO idea_fts(idea_fts) VALUES ('rebuild')` so existing idea rows are indexed. `SQLiteFTSSearchIndex.rebuild()` runs the same FTS rebuild command when a derived projection needs repair.
+- Mapping: `SearchIndex.upsert_idea(idea)` delegates through `SQLiteStorageBackend.save_idea()`, so the `ideas` table remains authoritative and SQLite triggers update the projection. It can be rebuilt from `ideas` at any time and must not become the only store for idea text or citation lineage.
+
+## Implemented FTS search behavior
+
+`SQLiteFTSSearchIndex.search(query, limit=10)` currently powers `GET /v1/ideas/search`.
+The query normalizer extracts Unicode word tokens with `re.compile(r"[\w]+", re.UNICODE)` and
+passes each token to SQLite as a quoted FTS term. Consequences:
+
+- Simple keyword searches are supported across idea text, tags, and source references.
+- Punctuation is ignored, so `local!!!` searches for `local`.
+- Blank or punctuation-only queries raise `EmptySearchQuery` and the API returns
+  `400 VALIDATION_ERROR` for field `q`.
+- Raw SQLite FTS syntax is not exposed. Operators such as `OR`, `NEAR`, prefix `*`, column
+  filters, and caller-supplied quoting are tokenized as plain terms or punctuation.
+- `limit` defaults to `10` and must be between `1` and `50`; invalid API limits return
+  `400 VALIDATION_ERROR` for field `limit`.
+
+Results are ordered by `bm25(idea_fts)` ascending, then `ideas.captured_at DESC`, then
+`ideas.id ASC`. Returned `SearchHit` values include `idea_id`, full idea `text` for service
+use, numeric `score`, one-based `rank`, `source`, `captured_at`, and an FTS snippet from the
+`text` column using `<mark>` / `</mark>` and `…`. The public API response returns only
+`idea_id`, `snippet`, `score`, `source`, `captured_at`, and `page`; it does not expose raw
+event payloads.
 
 ### `embeddings`
 
@@ -120,7 +146,7 @@ Initial runtime data maps into SQLite as follows:
 3. Create `idea_drafts` next with a foreign key to `raw_events` so extraction output can be stored and reprocessed.
 4. Create `ideas` with foreign keys to `raw_events` and `idea_drafts` so canonical ideas keep citation lineage.
 5. Create `idea_tags` after `ideas` because it is a derived filter projection.
-6. Create `idea_fts` after `ideas` because it indexes canonical idea rows and can be rebuilt from storage.
+6. Create `idea_fts` after `ideas` because it indexes canonical idea rows and can be rebuilt from storage. Migration `0002` requires SQLite FTS5 support and fails with an actionable migration error when the Python `sqlite3` build lacks FTS5.
 7. Defer `embeddings` until after FTS-backed search and cited query tests pass; if created early, leave it unused behind `EmbeddingProvider` and `SearchIndex` contracts.
 
 ## Compatibility and migration assumptions
