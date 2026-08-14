@@ -55,7 +55,8 @@ def _has_fts5(connection: sqlite3.Connection) -> bool:
 
 
 def _tags_to_storage(tags: tuple[str, ...]) -> str:
-    return " ".join(tag.strip().lower() for tag in tags if tag.strip())
+    normalized_tags = (tag.strip().lower() for tag in tags)
+    return " ".join(dict.fromkeys(tag for tag in normalized_tags if tag))
 
 
 def _tags_from_storage(tags: str) -> tuple[str, ...]:
@@ -401,7 +402,12 @@ class SQLiteStorageBackend:
 
     def delete_idea(self, idea_id: str) -> None:
         with self._connection:
-            self._connection.execute("DELETE FROM ideas WHERE id = ?", (idea_id,))
+            self._connection.execute(
+                "UPDATE ideas "
+                "SET deleted_at = datetime('now'), updated_at = datetime('now') "
+                "WHERE id = ?",
+                (idea_id,),
+            )
 
     def clear_fts_projection_for_test(self) -> None:
         with self._connection:

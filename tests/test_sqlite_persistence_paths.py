@@ -1,6 +1,7 @@
 from dataclasses import replace
 
 from idea_inbox.core.models import Idea, IdeaDraft, RawEvent
+from idea_inbox.search.sqlite_fts import SQLiteFTSSearchIndex
 from idea_inbox.storage.sqlite import SQLiteStorageBackend
 
 
@@ -89,6 +90,66 @@ def test_sqlite_storage_creates_reads_updates_and_lists_authoritative_records(tm
             ("idea_1",),
         ).fetchall()
         assert [row["tag"] for row in stored_tags] == ["sqlite", "storage"]
+    finally:
+        storage.close()
+
+
+def test_sqlite_storage_deduplicates_normalized_tags(tmp_path) -> None:
+    storage = SQLiteStorageBackend(tmp_path / "idea-inbox.sqlite3")
+    try:
+        storage.migrate()
+        storage.save_raw_event(raw_event())
+        storage.save_idea_draft(idea_draft())
+
+        stored_idea = storage.save_idea(
+            replace(idea(), tags=("SQLite", "sqlite", " SQLITE ", "Local-First", ""))
+        )
+
+        assert stored_idea.tags == ("sqlite", "local-first")
+        stored_tags = storage.connection.execute(
+            "SELECT tag FROM idea_tags WHERE idea_id = ? ORDER BY tag",
+            ("idea_1",),
+        ).fetchall()
+        assert [row["tag"] for row in stored_tags] == ["local-first", "sqlite"]
+    finally:
+        storage.close()
+
+
+def test_sqlite_storage_soft_deletes_ideas_without_losing_raw_lineage(tmp_path) -> None:
+    storage = SQLiteStorageBackend(tmp_path / "idea-inbox.sqlite3")
+    try:
+        storage.migrate()
+        storage.save_raw_event(raw_event())
+        storage.save_idea_draft(idea_draft())
+        storage.save_idea(idea())
+
+        storage.delete_idea("idea_1")
+
+        assert storage.get_raw_event("raw_1") is not None
+        assert storage.get_idea("idea_1") is not None
+        assert storage.list_ideas() == []
+        deleted_row = storage.connection.execute(
+            "SELECT deleted_at FROM ideas WHERE id = ?",
+            ("idea_1",),
+        ).fetchone()
+        assert deleted_row is not None
+        assert deleted_row["deleted_at"] is not None
+    finally:
+        storage.close()
+
+
+def test_sqlite_storage_soft_deleted_ideas_are_excluded_from_fts_search(tmp_path) -> None:
+    storage = SQLiteStorageBackend(tmp_path / "idea-inbox.sqlite3")
+    try:
+        storage.migrate()
+        storage.save_raw_event(raw_event())
+        storage.save_idea_draft(idea_draft())
+        storage.save_idea(idea())
+        search = SQLiteFTSSearchIndex(storage)
+
+        storage.delete_idea("idea_1")
+
+        assert search.search("local-first", limit=10) == []
     finally:
         storage.close()
 

@@ -63,7 +63,7 @@ class SQLiteFTSSearchIndex:
         normalized_query = _normalize_query(query)
         normalized_limit = _validate_limit(limit)
         filters = filters or {}
-        where_clauses = ["idea_fts MATCH ?"]
+        where_clauses = ["idea_fts MATCH ?", "ideas.deleted_at IS NULL"]
         parameters: list[Any] = [_SNIPPET_START, _SNIPPET_END, normalized_query]
 
         source = filters.get("source")
