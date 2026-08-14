@@ -19,7 +19,7 @@ This plan maps the current repository touchpoints documented in:
 
 ## Current persistence and configuration touchpoints
 
-The implementation is still a package and CLI skeleton, so there are no runtime storage modules yet. The persistence/configuration touchpoints that the first SQLite implementation must connect are:
+The implementation now includes runtime configuration, SQLite storage modules, migrations, FTS-backed search, and an importable WSGI API search surface. The persistence/configuration touchpoints that the SQLite implementation connects are:
 
 - CLI startup and migration commands: `idea-inbox migrate` applies deterministic migrations for the backend selected by configuration; `idea-inbox dev` and `idea-inbox serve` should verify or apply the same SQLite foundation before accepting writes.
 - Database selection: `IDEA_INBOX_DATABASE_URL` points at the local SQLite database in development (`sqlite+aiosqlite:///./data/idea-inbox.sqlite3`). It selects storage location/driver, not application data.

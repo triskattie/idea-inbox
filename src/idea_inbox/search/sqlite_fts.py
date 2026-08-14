@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import re
 import sqlite3
 from typing import Any
@@ -12,6 +13,13 @@ from idea_inbox.storage.sqlite import SQLiteStorageBackend
 DEFAULT_LIMIT = 10
 MAX_LIMIT = 50
 _TOKEN_PATTERN = re.compile(r"[\w]+", re.UNICODE)
+_SNIPPET_START = "\ue000"
+_SNIPPET_END = "\ue001"
+
+
+def _html_safe_snippet(snippet: str) -> str:
+    escaped = html.escape(snippet, quote=False)
+    return escaped.replace(_SNIPPET_START, "<mark>").replace(_SNIPPET_END, "</mark>")
 
 
 def _normalize_query(query: str) -> str:
@@ -56,7 +64,7 @@ class SQLiteFTSSearchIndex:
         normalized_limit = _validate_limit(limit)
         filters = filters or {}
         where_clauses = ["idea_fts MATCH ?"]
-        parameters: list[Any] = [normalized_query]
+        parameters: list[Any] = [_SNIPPET_START, _SNIPPET_END, normalized_query]
 
         source = filters.get("source")
         if source is not None:
@@ -72,7 +80,7 @@ class SQLiteFTSSearchIndex:
               bm25(idea_fts) AS score,
               ideas.source AS source,
               ideas.captured_at AS captured_at,
-              snippet(idea_fts, 0, '<mark>', '</mark>', '…', 32) AS snippet
+              snippet(idea_fts, 0, ?, ?, '…', 32) AS snippet
             FROM idea_fts
             JOIN ideas ON ideas.rowid = idea_fts.rowid
             WHERE {" AND ".join(where_clauses)}
@@ -89,7 +97,7 @@ class SQLiteFTSSearchIndex:
                 rank=index,
                 source=row["source"],
                 captured_at=row["captured_at"],
-                snippet=row["snippet"],
+                snippet=_html_safe_snippet(row["snippet"]),
             )
             for index, row in enumerate(rows, start=1)
         ]
