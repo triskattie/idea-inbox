@@ -3,13 +3,20 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs
 
 from idea_inbox.config import AppConfig, ConfigError, load_config
+from idea_inbox.core.manual_capture import (
+    ManualIdeaPayload,
+    ManualIdeaValidationError,
+    validate_manual_idea_payload,
+)
 from idea_inbox.core.models import EmptySearchQuery, SearchLimitError
+from idea_inbox.core.services import create_manual_idea
 from idea_inbox.search.sqlite_fts import DEFAULT_LIMIT, MAX_LIMIT, SQLiteFTSSearchIndex
 from idea_inbox.storage.sqlite import SQLiteMigrationError, SQLiteStorageBackend
 
@@ -32,7 +39,13 @@ def create_app(
     )
 
     def app(environ: dict[str, Any], start_response: StartResponse) -> Iterable[bytes]:
-        if environ.get("REQUEST_METHOD") != "GET" or environ.get("PATH_INFO") != "/v1/ideas/search":
+        method = environ.get("REQUEST_METHOD")
+        path = environ.get("PATH_INFO")
+
+        if method == "POST" and path == "/v1/ideas":
+            return _create_manual_idea_response(start_response, environ, resolved_database_path)
+
+        if method != "GET" or path != "/v1/ideas/search":
             return _json_response(
                 start_response,
                 "404 Not Found",
@@ -105,6 +118,66 @@ def _search_payload(database_path: str | Path, query: str, limit: int) -> dict[s
             for hit in hits
         ],
         "page": {"limit": limit, "next_cursor": None},
+    }
+
+
+def _create_manual_idea_response(
+    start_response: StartResponse,
+    environ: dict[str, Any],
+    database_path: str | Path,
+) -> list[bytes]:
+    try:
+        body = _read_json_body(environ)
+        manual_payload = validate_manual_idea_payload(body)
+        payload = _create_manual_idea_payload(database_path, manual_payload)
+    except ManualIdeaValidationError as exc:
+        return _json_response(
+            start_response,
+            "400 Bad Request",
+            _error("VALIDATION_ERROR", exc.message, {"field": exc.field}),
+        )
+    except (OSError, sqlite3.Error, SQLiteMigrationError):
+        return _json_response(
+            start_response,
+            "500 Internal Server Error",
+            _error("STORAGE_ERROR", "Idea could not be saved.", {}),
+        )
+
+    return _json_response(start_response, "201 Created", payload)
+
+
+def _read_json_body(environ: dict[str, Any]) -> Any:
+    try:
+        length = int(environ.get("CONTENT_LENGTH") or "0")
+    except ValueError as exc:
+        raise ManualIdeaValidationError("Request body must be valid JSON.", "body") from exc
+    body = environ["wsgi.input"].read(length)
+    try:
+        return json.loads(body.decode("utf-8") or "null")
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ManualIdeaValidationError("Request body must be valid JSON.", "body") from exc
+
+
+def _create_manual_idea_payload(
+    database_path: str | Path, manual_payload: ManualIdeaPayload
+) -> dict[str, Any]:
+    storage = SQLiteStorageBackend(database_path)
+    try:
+        storage.migrate()
+        result = create_manual_idea(storage, manual_payload)
+    finally:
+        storage.close()
+
+    return {
+        "item": {
+            "idea_id": result.idea.id,
+            "text": result.idea.text,
+            "source": result.idea.source,
+            "source_ref": result.idea.source_ref,
+            "captured_at": result.idea.captured_at,
+            "metadata": result.idea.metadata,
+            "tags": list(result.idea.tags),
+        }
     }
 
 

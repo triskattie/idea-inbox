@@ -127,8 +127,11 @@ Core code may depend on protocols and plain domain data types only. Adapter modu
 
 ### Current implementation baseline
 
-The repository now has first-pass configuration, SQLite storage, migrations, a SQLite FTS
-search adapter, and an importable WSGI API app for the search endpoint. `pyproject.toml`
+The repository now has first-pass configuration, SQLite storage, migrations, reusable manual
+capture validation, a SQLite FTS search adapter, and an importable WSGI API app for manual
+capture plus search endpoints. `POST /v1/ideas` validates and normalizes a JSON object with
+non-empty `text` plus optional `source_ref`, `actor_ref`, `captured_at`, `metadata`, and `tags`;
+it stores a manual raw event before persisting one draft and one canonical idea. `pyproject.toml`
 exposes the `idea-inbox` console script at `idea_inbox.cli:main`; `src/idea_inbox/cli.py`
 parses `dev`, `migrate`, and `serve`; and `idea-inbox migrate` applies deterministic SQLite
 migrations for the configured database or an explicit `--database` path.
@@ -326,8 +329,10 @@ Request:
 {
   "text": "Idea text",
   "source_ref": "optional caller reference",
+  "actor_ref": "optional local operator/source reference",
   "captured_at": "optional ISO-8601 timestamp",
-  "metadata": {}
+  "metadata": {},
+  "tags": ["optional", "labels"]
 }
 ```
 
@@ -335,20 +340,21 @@ Response `201 Created`:
 
 ```json
 {
-  "raw_event_id": "raw_...",
-  "ideas": [
-    {
-      "id": "idea_...",
-      "text": "Idea text",
-      "source": "manual",
-      "captured_at": "2026-08-09T00:00:00Z"
-    }
-  ],
-  "duplicate": false
+  "item": {
+    "idea_id": "idea_...",
+    "text": "Idea text",
+    "source": "manual",
+    "source_ref": "optional caller reference",
+    "captured_at": "2026-08-09T00:00:00Z",
+    "metadata": {},
+    "tags": ["optional", "labels"]
+  }
 }
 ```
 
-Manual capture should accept an optional idempotency key header. When the same key is replayed for the same source, it should return the existing result without creating duplicate raw events or ideas.
+The manual capture API boundary intentionally returns the newly captured `item` only. Raw event lineage and duplicate/idempotency bookkeeping remain persisted internally by the ingestion/storage layer and can be exposed by later dedicated read or audit endpoints if the MVP needs them. This keeps the public manual-create response aligned with the accepted strict-xfail contract in `tests/test_api_manual_ideas.py` while preserving the raw event → idea persistence requirement.
+
+Manual capture should accept an optional idempotency key header. When the same key is replayed for the same source, it should return the existing item without creating duplicate raw events or ideas.
 
 ### Generic connector ingestion
 

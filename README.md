@@ -83,6 +83,25 @@ versions/checksums in `schema_migrations`, and are safe to re-run when migration
 unchanged. The first migrations create authoritative `raw_events`, `idea_drafts`, `ideas`, and
 `idea_tags` tables plus the rebuildable `idea_fts` FTS5 projection.
 
+## Manual idea capture
+
+The importable WSGI app accepts manual ideas as:
+
+```text
+POST /v1/ideas
+```
+
+The JSON request body must be an object with non-empty string `text`. Optional fields are
+`source_ref`, `actor_ref`, `captured_at`, `metadata`, and `tags`. Text and string references are
+trimmed; blank tags are ignored; tags are lower-cased and de-duplicated; metadata must be a JSON
+object. Validation failures return the standard `400 VALIDATION_ERROR` response with the
+actionable field in `error.details.field`.
+
+Successful manual capture stores the normalized request as a `manual` raw event first, then
+persists one idea draft and one canonical idea for search/citation lineage. The public response
+returns the created idea id, normalized text, source metadata, capture timestamp, metadata, and
+tags without exposing persistence internals.
+
 ## FTS-backed search
 
 The first search slice is available through the importable WSGI app as:

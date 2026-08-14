@@ -8,11 +8,6 @@ import pytest
 from idea_inbox.api import create_app
 from idea_inbox.storage.sqlite import SQLiteStorageBackend
 
-pytestmark = pytest.mark.xfail(
-    reason="POST /v1/ideas manual capture is the next implementation slice",
-    strict=True,
-)
-
 
 def request(
     app,
@@ -152,3 +147,61 @@ def test_manual_idea_create_endpoint_rejects_invalid_optional_metadata(
             "details": {"field": "metadata"},
         }
     }
+
+
+def test_manual_idea_create_endpoint_trims_reusable_payload_fields(tmp_path: Path) -> None:
+    app = create_app(database_path=tmp_path / "ideas.sqlite3")
+
+    status, _headers, payload = request(
+        app,
+        "/v1/ideas",
+        json_body={
+            "text": "  Trim this idea before storing.  ",
+            "source_ref": "  manual-note-2  ",
+            "actor_ref": "  local-operator  ",
+            "tags": [" Local-AI ", "capture", "local-ai", "  "],
+        },
+    )
+
+    assert status == "201 Created"
+    assert payload["item"]["text"] == "Trim this idea before storing."
+    assert payload["item"]["source_ref"] == "manual-note-2"
+    assert payload["item"]["tags"] == ["local-ai", "capture"]
+
+
+def test_manual_idea_create_endpoint_rejects_malformed_optional_fields(tmp_path: Path) -> None:
+    app = create_app(database_path=tmp_path / "ideas.sqlite3")
+
+    invalid_cases = [
+        (
+            {"text": "Valid idea text", "source_ref": 42},
+            "source_ref",
+            "Idea source_ref must be a string.",
+        ),
+        (
+            {"text": "Valid idea text", "actor_ref": 42},
+            "actor_ref",
+            "Idea actor_ref must be a string.",
+        ),
+        (
+            {"text": "Valid idea text", "tags": "local-ai"},
+            "tags",
+            "Idea tags must be a list of strings.",
+        ),
+        (
+            {"text": "Valid idea text", "tags": ["ok", 42]},
+            "tags",
+            "Idea tags must be a list of strings.",
+        ),
+    ]
+    for body, field, message in invalid_cases:
+        status, _headers, payload = request(app, "/v1/ideas", json_body=body)
+
+        assert status == "400 Bad Request"
+        assert payload == {
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": message,
+                "details": {"field": field},
+            }
+        }
