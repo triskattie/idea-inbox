@@ -118,6 +118,35 @@ def test_docs_describe_implemented_fts_search_behavior() -> None:
     assert "preserving the\n`ideas_ai`, `ideas_au`, and `ideas_ad` triggers" in contributing
 
 
+def test_docs_describe_sqlite_setup_and_migration_behavior() -> None:
+    readme = read_doc("README.md")
+    contributing = read_doc("CONTRIBUTING.md")
+    self_hosting = read_doc("docs/self-hosting.md")
+    env_example = read_doc(".env.example")
+
+    assert "IDEA_INBOX_DATABASE_URL=sqlite:///./data/idea-inbox.sqlite3" in env_example
+    assert (
+        "Alternative: set IDEA_INBOX_SQLITE_PATH instead of IDEA_INBOX_DATABASE_URL" in env_example
+    )
+
+    assert "## SQLite setup" in readme
+    assert "uv run idea-inbox migrate" in readme
+    assert "Defaults to `sqlite:///./data/idea-inbox.sqlite3`" in readme
+    assert (
+        "`IDEA_INBOX_DATABASE_URL` accepts `sqlite:///` and `sqlite+aiosqlite:///` URLs" in readme
+    )
+    assert "Do not set `IDEA_INBOX_DATABASE_URL` and `IDEA_INBOX_SQLITE_PATH` together" in readme
+
+    assert "### SQLite local development database" in contributing
+    assert "rm -f data/idea-inbox.sqlite3" in contributing
+    assert "re-run `uv run idea-inbox migrate`" in contributing
+
+    assert "## SQLite configuration" in self_hosting
+    assert "`uv run idea-inbox migrate --database ./path/to/ideas.sqlite3`" in self_hosting
+    assert "Migration checksums are recorded in `schema_migrations`" in self_hosting
+    assert "delete the\nconfigured `.sqlite3` file and run migrations again" in self_hosting
+
+
 def test_project_documents_human_supervised_hermes_development() -> None:
     readme = read_doc("README.md")
     doc = read_doc("docs/development-with-hermes.md")

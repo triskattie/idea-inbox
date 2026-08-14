@@ -82,6 +82,29 @@ and add tests proving insert, update, delete, rebuild, and raw-payload non-index
 Do not index `raw_events.payload` directly. Raw events are the authoritative audit trail;
 search and cited answers must resolve through stored `ideas` and stable idea IDs.
 
+### SQLite local development database
+
+The default local database is `sqlite:///./data/idea-inbox.sqlite3`, configured through
+`IDEA_INBOX_DATABASE_URL` in `.env.example`. Contributors may instead set
+`IDEA_INBOX_SQLITE_PATH` to a plain file path, but should not set both variables at once.
+
+Apply or refresh the local schema with:
+
+```bash
+uv run idea-inbox migrate
+```
+
+For a throwaway development reset, stop any running Idea Inbox process, remove the local SQLite
+file, and re-run `uv run idea-inbox migrate`:
+
+```bash
+rm -f data/idea-inbox.sqlite3
+uv run idea-inbox migrate
+```
+
+Only use this reset for disposable local development data. SQLite migrations preserve raw
+events and derived ideas in normal use; deleting the database removes that audit trail.
+
 ## Testing standards
 
 Strict TDD for behavior changes:

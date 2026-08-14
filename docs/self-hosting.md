@@ -19,6 +19,25 @@ hosted-model credentials, hidden outbound model calls, or telemetry. Hosted mode
 may be configured explicitly later, but they are optional accelerators rather than a
 requirement for local development.
 
+## SQLite configuration
+
+SQLite is the current implemented persistence backend. By default, Idea Inbox uses
+`sqlite:///./data/idea-inbox.sqlite3`, resolved relative to the directory where the CLI process
+is started. The repository template stores that value in `.env.example` as
+`IDEA_INBOX_DATABASE_URL`.
+
+Use one database location setting at a time:
+
+- `IDEA_INBOX_DATABASE_URL=sqlite:///./data/idea-inbox.sqlite3` for a SQLite URL.
+- `IDEA_INBOX_DATABASE_URL=sqlite+aiosqlite:///./data/idea-inbox.sqlite3` if a future async
+  caller needs the SQLAlchemy-style SQLite URL form; the current storage path still resolves it
+  to the same local file.
+- `IDEA_INBOX_SQLITE_PATH=./data/idea-inbox.sqlite3` for a plain path.
+
+If `IDEA_INBOX_DATABASE_URL` and `IDEA_INBOX_SQLITE_PATH` are both set, configuration loading
+fails before migrations run. The MVP backend rejects non-SQLite URLs such as Postgres until a
+separate Postgres storage adapter is implemented.
+
 ## Current SQLite migrations and search index
 
 SQLite is the current runnable persistence path. Apply migrations with:
@@ -29,8 +48,20 @@ uv run idea-inbox migrate
 
 Use `uv run idea-inbox migrate --database ./path/to/ideas.sqlite3` to migrate a specific
 database file instead of the configured `IDEA_INBOX_DATABASE_URL` / `IDEA_INBOX_SQLITE_PATH`.
-Migration `0002_idea_fts.sql` creates the `idea_fts` SQLite FTS5 projection over canonical
-ideas and finishes with an FTS rebuild so existing `ideas` rows become searchable.
+Migrations create parent directories for file-backed databases before opening SQLite.
+
+The migration runner creates `schema_migrations`, then applies numbered SQL files from
+`src/idea_inbox/storage/migrations/` in filename order. Migration checksums are recorded in `schema_migrations`.
+If an already-applied migration's name or checksum changes, migration stops with an error
+instead of silently continuing. Re-running `uv run idea-inbox migrate` is expected to be a no-op
+after the current migration set has been applied.
+
+Current migration files:
+
+- `0001_initial_storage.sql` creates authoritative `raw_events`, `idea_drafts`, `ideas`, and
+  `idea_tags` tables and supporting indexes.
+- `0002_idea_fts.sql` creates the `idea_fts` SQLite FTS5 projection over canonical ideas and
+  finishes with an FTS rebuild so existing `ideas` rows become searchable.
 
 Operational notes:
 
@@ -44,6 +75,20 @@ Operational notes:
 - Search currently runs through the importable WSGI app at `GET /v1/ideas/search?q=...&limit=10`.
   The CLI `serve` command still parses options but does not start an HTTP server yet, so
   deployment packaging still needs a server entrypoint around `idea_inbox.api.create_app`.
+
+## Resetting a local development database
+
+For disposable local development data, stop any running Idea Inbox process, delete the
+configured `.sqlite3` file and run migrations again:
+
+```bash
+rm -f data/idea-inbox.sqlite3
+uv run idea-inbox migrate
+```
+
+If you use a custom path, delete that file instead. Do not use this as an upgrade procedure for
+real self-hosted data: raw events are the audit/reprocessing source, and deleting the database
+removes the raw-event trail, drafts, ideas, tags, and search projection together.
 
 ## Planned lightweight self-hosting
 

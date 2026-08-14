@@ -48,9 +48,40 @@ This repository is still being initialized, so the current command only verifies
 providers by default; it does not require hosted-model credentials, hidden outbound model
 calls, or telemetry.
 
-SQLite configuration now defaults to `sqlite:///./data/idea-inbox.sqlite3` relative to the
-project root. Override the database location with `IDEA_INBOX_DATABASE_URL` or
-`IDEA_INBOX_SQLITE_PATH`, but not both.
+## SQLite setup
+
+SQLite is the current runnable persistence path for local development and lightweight
+self-hosting.
+
+Defaults to `sqlite:///./data/idea-inbox.sqlite3` relative to the directory where the CLI is
+run. The template `.env.example` sets the same value as `IDEA_INBOX_DATABASE_URL`.
+
+Configure the database location with one of these settings:
+
+- `IDEA_INBOX_DATABASE_URL` accepts `sqlite:///` and `sqlite+aiosqlite:///` URLs. Relative
+  paths, such as `sqlite:///./data/idea-inbox.sqlite3`, resolve from the current project root.
+- `IDEA_INBOX_SQLITE_PATH` accepts a plain SQLite file path, such as
+  `./data/idea-inbox.sqlite3` or `/srv/idea-inbox/idea-inbox.sqlite3`.
+
+Do not set `IDEA_INBOX_DATABASE_URL` and `IDEA_INBOX_SQLITE_PATH` together; startup and
+migration commands reject conflicting database location settings.
+
+Initialize or update the schema with:
+
+```bash
+uv run idea-inbox migrate
+```
+
+To migrate a specific local database file without changing `.env`, run:
+
+```bash
+uv run idea-inbox migrate --database ./path/to/ideas.sqlite3
+```
+
+Migrations create parent directories for file-backed databases, record applied migration
+versions/checksums in `schema_migrations`, and are safe to re-run when migration files are
+unchanged. The first migrations create authoritative `raw_events`, `idea_drafts`, `ideas`, and
+`idea_tags` tables plus the rebuildable `idea_fts` FTS5 projection.
 
 ## FTS-backed search
 
