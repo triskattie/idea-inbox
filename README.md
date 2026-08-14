@@ -135,8 +135,9 @@ network listeners, or emit telemetry.
 
 ### Startup commands
 
-The CLI now parses the planned startup commands, but the API, storage migration, and server
-runtime modules are still pending. Until those modules exist, startup commands validate their
+The CLI now parses the planned startup commands. Storage migrations are implemented via
+`idea-inbox migrate`, and the importable WSGI API currently exposes the search endpoint.
+The long-running `dev` and `serve` server entrypoints are still pending, so startup commands validate their
 arguments and then fail with actionable not-implemented messages.
 
 | Command | Purpose | Current behavior |

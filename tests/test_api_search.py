@@ -127,6 +127,31 @@ def test_search_endpoint_returns_empty_page_for_no_fts_hits(tmp_path: Path) -> N
     assert payload == {"items": [], "page": {"limit": 10, "next_cursor": None}}
 
 
+def test_search_endpoint_escapes_user_text_in_highlight_snippets(tmp_path: Path) -> None:
+    database_path = tmp_path / "ideas.sqlite3"
+    storage = SQLiteStorageBackend(database_path)
+    storage.migrate()
+    storage.save_raw_event(raw_event("raw_xss"))
+    storage.save_idea(
+        idea(
+            "idea_xss",
+            "raw_xss",
+            '<script>alert("x")</script> local',
+            "2026-08-09T00:00:00Z",
+        )
+    )
+    storage.close()
+    app = create_app(database_path=database_path)
+
+    status, _headers, payload = request(app, "/v1/ideas/search?q=local")
+
+    assert status == "200 OK"
+    assert payload["items"][0]["snippet"] == (
+        '&lt;script&gt;alert("x")&lt;/script&gt; <mark>local</mark>'
+    )
+    assert "<script>" not in payload["items"][0]["snippet"]
+
+
 def test_search_app_accepts_canonical_config_database_path(tmp_path: Path) -> None:
     database_path = tmp_path / "ideas.sqlite3"
     seed_database(database_path)
