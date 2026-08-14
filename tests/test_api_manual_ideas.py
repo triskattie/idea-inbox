@@ -1,0 +1,154 @@
+import json
+from io import BytesIO
+from pathlib import Path
+from wsgiref.util import setup_testing_defaults
+
+import pytest
+
+from idea_inbox.api import create_app
+from idea_inbox.storage.sqlite import SQLiteStorageBackend
+
+pytestmark = pytest.mark.xfail(
+    reason="POST /v1/ideas manual capture is the next implementation slice",
+    strict=True,
+)
+
+
+def request(
+    app,
+    path: str,
+    *,
+    method: str = "POST",
+    json_body: dict | None = None,
+    raw_body: bytes | None = None,
+) -> tuple[str, dict[str, str], dict]:
+    body = raw_body or (json.dumps(json_body).encode("utf-8") if json_body is not None else b"")
+    environ: dict[str, object] = {}
+    setup_testing_defaults(environ)
+    environ.update(
+        {
+            "REQUEST_METHOD": method,
+            "PATH_INFO": path,
+            "QUERY_STRING": "",
+            "CONTENT_LENGTH": str(len(body)),
+            "CONTENT_TYPE": "application/json",
+            "wsgi.input": BytesIO(body),
+        }
+    )
+    response_status = ""
+    response_headers: dict[str, str] = {}
+
+    def start_response(status: str, headers: list[tuple[str, str]]) -> None:
+        nonlocal response_status, response_headers
+        response_status = status
+        response_headers = dict(headers)
+
+    response_body = b"".join(app(environ, start_response))
+    return response_status, response_headers, json.loads(response_body.decode("utf-8"))
+
+
+def test_manual_idea_create_endpoint_accepts_text_and_returns_boundary_shape(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "ideas.sqlite3"
+    app = create_app(database_path=database_path)
+
+    status, headers, payload = request(
+        app,
+        "/v1/ideas",
+        json_body={
+            "text": "Remember to prototype local-first capture before connector work.",
+            "source_ref": "manual-note-1",
+            "actor_ref": "local-operator",
+            "metadata": {"surface": "api-test"},
+            "tags": ["local-ai", "capture"],
+        },
+    )
+
+    assert status == "201 Created"
+    assert headers["Content-Type"] == "application/json"
+    assert payload == {
+        "item": {
+            "idea_id": payload["item"]["idea_id"],
+            "text": "Remember to prototype local-first capture before connector work.",
+            "source": "manual",
+            "source_ref": "manual-note-1",
+            "captured_at": payload["item"]["captured_at"],
+            "metadata": {"surface": "api-test"},
+            "tags": ["local-ai", "capture"],
+        }
+    }
+    assert isinstance(payload["item"]["idea_id"], str)
+    assert payload["item"]["idea_id"]
+    assert isinstance(payload["item"]["captured_at"], str)
+
+    storage = SQLiteStorageBackend(database_path)
+    try:
+        assert storage.count_raw_events() == 1
+        raw_rows = storage.connection.execute("SELECT * FROM raw_events").fetchall()
+        idea_rows = storage.connection.execute("SELECT * FROM ideas").fetchall()
+    finally:
+        storage.close()
+    assert len(raw_rows) == 1
+    assert len(idea_rows) == 1
+    assert raw_rows[0]["source"] == "manual"
+    assert raw_rows[0]["actor_ref"] == "local-operator"
+    assert json.loads(raw_rows[0]["payload"])["text"] == payload["item"]["text"]
+    assert idea_rows[0]["raw_event_id"] == raw_rows[0]["id"]
+
+
+@pytest.mark.parametrize("body", [{}, {"text": ""}, {"text": "   \n\t  "}])
+def test_manual_idea_create_endpoint_rejects_missing_or_blank_text(
+    tmp_path: Path,
+    body: dict,
+) -> None:
+    app = create_app(database_path=tmp_path / "ideas.sqlite3")
+
+    status, _headers, payload = request(app, "/v1/ideas", json_body=body)
+
+    assert status == "400 Bad Request"
+    assert payload == {
+        "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Idea text must not be empty.",
+            "details": {"field": "text"},
+        }
+    }
+
+
+def test_manual_idea_create_endpoint_rejects_non_object_body_with_useful_error(
+    tmp_path: Path,
+) -> None:
+    app = create_app(database_path=tmp_path / "ideas.sqlite3")
+
+    status, _headers, payload = request(app, "/v1/ideas", raw_body=b'"not an object"')
+
+    assert status == "400 Bad Request"
+    assert payload == {
+        "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Request body must be a JSON object.",
+            "details": {"field": "body"},
+        }
+    }
+
+
+def test_manual_idea_create_endpoint_rejects_invalid_optional_metadata(
+    tmp_path: Path,
+) -> None:
+    app = create_app(database_path=tmp_path / "ideas.sqlite3")
+
+    status, _headers, payload = request(
+        app,
+        "/v1/ideas",
+        json_body={"text": "Valid idea text", "metadata": "not an object"},
+    )
+
+    assert status == "400 Bad Request"
+    assert payload == {
+        "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Idea metadata must be a JSON object.",
+            "details": {"field": "metadata"},
+        }
+    }
