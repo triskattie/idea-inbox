@@ -133,14 +133,14 @@ capture plus search endpoints. `POST /v1/ideas` validates and normalizes a JSON 
 non-empty `text` plus optional `source_ref`, `actor_ref`, `captured_at`, `metadata`, and `tags`;
 it stores a manual raw event before persisting one draft and one canonical idea. `pyproject.toml`
 exposes the `idea-inbox` console script at `idea_inbox.cli:main`; `src/idea_inbox/cli.py`
-parses `dev`, `migrate`, and `serve`; and `idea-inbox migrate` applies deterministic SQLite
-migrations for the configured database or an explicit `--database` path.
+parses `dev`, `migrate`, and `serve`; `idea-inbox migrate` applies deterministic SQLite
+migrations for the configured database or an explicit `--database` path; and `idea-inbox dev` /
+`idea-inbox serve` start the WSGI API after applying pending migrations.
 
-The `dev` and `serve` commands still parse options and fail with actionable not-implemented
-errors because the HTTP server runtime is not wired yet. User-facing docs should continue to
-distinguish the current smoke command (`uv run idea-inbox`), the runnable migration command,
-the importable WSGI app surface, and startup commands such as `idea-inbox dev` or
-`idea-inbox serve` that are still server-entrypoint placeholders.
+User-facing docs distinguish the smoke command (`uv run idea-inbox`), the runnable migration
+command, the importable WSGI app surface, and the long-running CLI startup commands. Direct
+content-management CLI commands such as `idea-inbox capture`, `idea-inbox search`, and
+`idea-inbox query` remain intentionally deferred while the MVP uses `/v1` HTTP endpoints first.
 
 ## Core domain concepts and interfaces
 

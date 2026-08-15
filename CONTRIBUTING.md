@@ -126,7 +126,9 @@ Testing rules:
 ## API standards
 
 - Versioned REST endpoints under `/v1`.
-- Pydantic request/response schemas.
+- Keep the runtime dependency-free until a framework/schema dependency is explicitly accepted.
+  Current stdlib WSGI handlers use dataclass request DTOs, typed response dictionaries, and
+  manual validation at the HTTP boundary instead of external schema models.
 - Consistent error shape:
 
 ```json

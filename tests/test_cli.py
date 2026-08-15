@@ -52,25 +52,69 @@ def test_invalid_invocations_exit_two_with_usage_error(
     assert "error:" in stderr
 
 
-@pytest.mark.parametrize(
-    ("args", "expected_message"),
-    [
-        (["dev"], "development API startup is not implemented yet"),
-        (
-            ["serve", "--host", "127.0.0.1", "--port", "8080"],
-            "API server startup is not implemented yet",
-        ),
-    ],
-)
-def test_planned_commands_dispatch_to_actionable_startup_failures(
-    args: list[str], expected_message: str, capsys: pytest.CaptureFixture[str]
+def test_serve_reports_configuration_errors_without_secrets(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    exit_code, stdout, stderr = invoke_cli(args, capsys)
+    monkeypatch.setenv("IDEA_INBOX_DATABASE_URL", "sqlite:///./one.sqlite3")
+    monkeypatch.setenv("IDEA_INBOX_SQLITE_PATH", "./two.sqlite3")
+
+    exit_code, stdout, stderr = invoke_cli(["serve"], capsys)
 
     assert exit_code == 1
     assert stdout == ""
-    assert expected_message in stderr
+    assert "invalid configuration" in stderr
     assert "secrets" not in stderr.lower()
+
+
+def test_serve_starts_api_surface_for_manual_capture(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    database_path = tmp_path / "ideas.sqlite3"
+    calls: list[tuple[str, int, object]] = []
+
+    def fake_run_api_server(host: str, port: int, database_path: object) -> int:
+        calls.append((host, port, database_path))
+        return 0
+
+    monkeypatch.setattr(cli, "run_api_server", fake_run_api_server)
+
+    exit_code, stdout, stderr = invoke_cli(
+        [
+            "serve",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "9090",
+            "--database",
+            str(database_path),
+        ],
+        capsys,
+    )
+
+    assert exit_code == 0
+    assert stdout == ""
+    assert stderr == ""
+    assert calls == [("0.0.0.0", 9090, database_path)]
+
+
+def test_dev_starts_api_surface_with_configured_default_database(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    calls: list[tuple[str, int, object]] = []
+
+    def fake_run_api_server(host: str, port: int, database_path: object) -> int:
+        calls.append((host, port, database_path))
+        return 0
+
+    monkeypatch.setattr(cli, "run_api_server", fake_run_api_server)
+
+    exit_code, stdout, stderr = invoke_cli(["dev"], capsys)
+
+    assert exit_code == 0
+    assert stdout == ""
+    assert stderr == ""
+    assert calls == [("127.0.0.1", 8080, tmp_path / "data" / "idea-inbox.sqlite3")]
 
 
 def test_migrate_applies_sqlite_migrations_to_requested_database(

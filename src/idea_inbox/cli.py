@@ -3,7 +3,9 @@
 import argparse
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 
+from idea_inbox.api.server import run_api_server
 from idea_inbox.config import ConfigError, load_config
 from idea_inbox.storage.sqlite import SQLiteMigrationError, SQLiteStorageBackend
 
@@ -40,6 +42,10 @@ def _build_parser() -> argparse.ArgumentParser:
         type=_port,
         help=f"bind port (default: {DEFAULT_PORT})",
     )
+    dev.add_argument(
+        "--database",
+        help="SQLite database path for the development API (default: configured path)",
+    )
     dev.set_defaults(handler=_run_dev)
 
     migrate = subcommands.add_parser(
@@ -63,19 +69,34 @@ def _build_parser() -> argparse.ArgumentParser:
         type=_port,
         help=f"bind port (default: {DEFAULT_PORT})",
     )
+    serve.add_argument(
+        "--database",
+        help="SQLite database path for the API (default: configured path)",
+    )
     serve.set_defaults(handler=_run_serve)
 
     return parser
 
 
 def _run_dev(args: argparse.Namespace) -> int:
-    print(
-        "idea-inbox: development API startup is not implemented yet; "
-        "the CLI parsed dev options successfully and will wire into the API/server module "
-        f"when it exists (host={args.host}, port={args.port}).",
-        file=sys.stderr,
-    )
+    return _run_api_surface(args, label="development API")
+
+
+def _run_api_surface(args: argparse.Namespace, *, label: str) -> int:
+    try:
+        database_path = _database_path_for_args(args)
+        return run_api_server(args.host, args.port, database_path)
+    except ConfigError as exc:
+        print(f"idea-inbox: invalid configuration: {exc}", file=sys.stderr)
+    except (OSError, SQLiteMigrationError) as exc:
+        print(f"idea-inbox: failed to start {label}: {exc}", file=sys.stderr)
     return 1
+
+
+def _database_path_for_args(args: argparse.Namespace) -> Path:
+    if args.database:
+        return Path(args.database)
+    return load_config().database_path
 
 
 def _run_migrate(args: argparse.Namespace) -> int:
@@ -99,13 +120,7 @@ def _run_migrate(args: argparse.Namespace) -> int:
 
 
 def _run_serve(args: argparse.Namespace) -> int:
-    print(
-        "idea-inbox: API server startup is not implemented yet; "
-        "the CLI parsed serve options successfully and will wire into the API/server module "
-        f"when it exists (host={args.host}, port={args.port}).",
-        file=sys.stderr,
-    )
-    return 1
+    return _run_api_surface(args, label="API server")
 
 
 def main(argv: Sequence[str] | None = None) -> int:

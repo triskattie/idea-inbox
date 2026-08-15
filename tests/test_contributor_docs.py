@@ -7,13 +7,19 @@ def read_doc(relative_path: str) -> str:
     return (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
 
 
+def squash_whitespace(text: str) -> str:
+    return " ".join(text.split())
+
+
 def test_readme_quick_start_uses_current_smoke_command_not_planned_dev_command() -> None:
     readme = read_doc("README.md")
     quick_start = readme.split("## Quick start", 1)[1].split("## CLI usage", 1)[0]
 
     assert "uv run idea-inbox\n" in quick_start
     assert "uv run idea-inbox dev" not in quick_start
-    assert "only verifies that the package and CLI entry point run" in quick_start
+    assert "only verifies that the package and CLI entry point run" in squash_whitespace(
+        quick_start
+    )
 
 
 def test_contributing_separates_runnable_commands_from_planned_type_checking() -> None:
@@ -73,10 +79,16 @@ def test_readme_documents_current_and_planned_cli_usage() -> None:
     assert "uv run idea-inbox\n" in readme
     assert "prints top-level CLI help and exits `0`" in readme
     assert "### Startup commands" in readme
-    assert "startup commands validate their\narguments" in readme
-    assert "`uv run idea-inbox dev [--host 127.0.0.1] [--port 8080]`" in readme
+    assert "start the WSGI `/v1` API" in readme
+    assert (
+        "`uv run idea-inbox dev [--host 127.0.0.1] [--port 8080] "
+        "[--database ./data/idea-inbox.sqlite3]`" in readme
+    )
     assert "`uv run idea-inbox migrate [--database ./data/idea-inbox.sqlite3]`" in readme
-    assert "`uv run idea-inbox serve [--host 127.0.0.1] [--port 8080]`" in readme
+    assert (
+        "`uv run idea-inbox serve [--host 127.0.0.1] [--port 8080] "
+        "[--database ./data/idea-inbox.sqlite3]`" in readme
+    )
     assert "Unknown commands or invalid options" in readme
     assert "Deferred direct content commands" in readme
 
@@ -145,6 +157,38 @@ def test_docs_describe_sqlite_setup_and_migration_behavior() -> None:
     assert "`uv run idea-inbox migrate --database ./path/to/ideas.sqlite3`" in self_hosting
     assert "Migration checksums are recorded in `schema_migrations`" in self_hosting
     assert "delete the\nconfigured `.sqlite3` file and run migrations again" in self_hosting
+
+
+def test_docs_track_current_cli_api_and_manual_capture_surface() -> None:
+    readme = read_doc("README.md")
+    self_hosting = read_doc("docs/self-hosting.md")
+    connectors = read_doc("docs/connectors.md")
+    contributing = read_doc("CONTRIBUTING.md")
+    changelog = read_doc("CHANGELOG.md")
+
+    assert "Address already in use` from `dev` or `serve`" in readme
+    assert "not-implemented message from `dev`, `migrate`, or `serve`" not in readme
+    assert "not-implemented message from `dev` or `serve`" not in readme
+
+    assert "## Current local development path" in self_hosting
+    assert "placeholder CLI" not in self_hosting
+    assert "smoke-only" not in self_hosting
+    assert "POST /v1/ideas" in self_hosting
+    assert "GET /v1/ideas/search?q=...&limit=10" in self_hosting
+    assert "uv run idea-inbox dev --host 127.0.0.1 --port 8080" in self_hosting
+    assert "do not start a\nlong-running HTTP process" not in self_hosting
+
+    assert "## Implemented connectors" in connectors
+    assert "- Manual API (`POST /v1/ideas`)" in connectors
+    assert "- Manual API" not in connectors.split("## Planned connectors", 1)[1]
+
+    assert "Pydantic request/response schemas" not in contributing
+    assert "dataclass request DTOs" in contributing
+    assert "manual validation" in contributing
+
+    assert "runnable `dev`/`serve` WSGI API startup" in changelog
+    assert "Manual idea capture through `POST /v1/ideas`" in changelog
+    assert "WSGI API endpoints for manual capture and FTS-backed idea search" in changelog
 
 
 def test_project_documents_human_supervised_hermes_development() -> None:

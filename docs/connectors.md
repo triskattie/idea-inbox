@@ -14,9 +14,13 @@ A connector should:
 
 Connectors may depend on core domain contracts, but core domain code must not depend on connector packages, provider SDKs, webhook framework types, or third-party account clients. If extraction rules change, drafts should be regenerated from stored raw events rather than by replaying external provider APIs.
 
+## Implemented connectors
+
+- Manual API (`POST /v1/ideas`) stores user-submitted ideas as `manual` raw events before
+  creating derived drafts and canonical ideas.
+
 ## Planned connectors
 
-- Manual API
 - Generic webhook
 - Telegram
 - Email/IMAP

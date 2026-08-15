@@ -2,22 +2,36 @@
 
 Target deployment modes, separated by what is available now versus what is planned.
 
-## Current local smoke setup
+## Current local development path
 
-The repository is currently in initialization. The available local path is a smoke setup
-that installs the package and runs the placeholder CLI with SQLite-oriented configuration
-and mock/local providers.
+The current self-hosting baseline is a local SQLite database plus a runnable WSGI API. The
+top-level CLI command verifies that the package entry point works, `idea-inbox migrate` applies
+the real SQLite schema and FTS migrations, and `idea-inbox dev`/`idea-inbox serve` start the
+local API process.
 
 ```bash
 uv sync
 cp .env.example .env
 uv run idea-inbox
+uv run idea-inbox migrate
+uv run idea-inbox dev --host 127.0.0.1 --port 8080
 ```
 
 Local/mock mode is the privacy-preserving default for development: it must not require
-hosted-model credentials, hidden outbound model calls, or telemetry. Hosted model providers
-may be configured explicitly later, but they are optional accelerators rather than a
-requirement for local development.
+hosted-model credentials, hidden outbound model calls, or telemetry. Hosted model providers may
+be configured explicitly later, but they are optional accelerators rather than a requirement for
+local development.
+
+The WSGI API app is available as `idea_inbox.api.create_app`, and the CLI server wrapper starts
+it after applying pending SQLite migrations. It currently exposes:
+
+- `POST /v1/ideas` for manual idea capture. The endpoint validates and normalizes the JSON body,
+  stores a `manual` raw event first, then persists the derived draft and canonical idea.
+- `GET /v1/ideas/search?q=...&limit=10` for SQLite FTS-backed search over stored ideas.
+
+`dev` is the local development entrypoint. `serve` exposes the same API with explicit host/port
+options for local or self-hosted use. Production packaging still needs a Dockerfile, Compose file,
+or service-unit wrapper before this is a turnkey deployment artifact.
 
 ## SQLite configuration
 
@@ -92,9 +106,9 @@ removes the raw-event trail, drafts, ideas, tags, and search projection together
 
 ## Planned lightweight self-hosting
 
-The intended lightweight self-host path is SQLite, the built-in API, and mock or local
-providers packaged for a single host. A Docker image may become the convenient packaging
-format once the repository includes a Dockerfile and a published image exists.
+The intended lightweight self-host path is the current SQLite-backed WSGI API plus mock or local
+providers packaged for a single host. A Docker image may become the convenient packaging format
+once the repository includes a Dockerfile and a published image exists.
 
 ## Planned production self-hosting
 

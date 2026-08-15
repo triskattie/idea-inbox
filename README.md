@@ -27,7 +27,10 @@ See [Development with Hermes Agent](docs/development-with-hermes.md) for the col
 
 ## Development status
 
-This repository is currently being initialized. See:
+This repository now has a runnable local SQLite path, deterministic migrations, an importable
+WSGI API for manual capture and FTS-backed search, and parsed CLI startup commands. Long-running
+`dev` and `serve` process startup, external connectors, provider-backed answer generation, and
+packaged deployment assets are still planned. See:
 
 - [Development standards](CONTRIBUTING.md)
 - [Architecture overview](docs/architecture.md)
@@ -36,7 +39,7 @@ This repository is currently being initialized. See:
 
 ## Quick start
 
-Current local smoke setup:
+Current local development setup:
 
 ```bash
 uv sync
@@ -44,9 +47,10 @@ cp .env.example .env
 uv run idea-inbox
 ```
 
-This repository is still being initialized, so the current command only verifies that the package and CLI entry point run. The local development path uses SQLite plus mock/local
-providers by default; it does not require hosted-model credentials, hidden outbound model
-calls, or telemetry.
+The default command prints top-level CLI help and exits `0`; it only verifies that the package and
+CLI entry point run. The local development path uses SQLite plus mock/local providers by default;
+it does not require hosted-model credentials, hidden outbound model calls, or telemetry. Run
+`uv run idea-inbox migrate` before using the importable WSGI API against a local database.
 
 ## SQLite setup
 
@@ -154,16 +158,15 @@ network listeners, or emit telemetry.
 
 ### Startup commands
 
-The CLI now parses the planned startup commands. Storage migrations are implemented via
-`idea-inbox migrate`, and the importable WSGI API currently exposes the search endpoint.
-The long-running `dev` and `serve` server entrypoints are still pending, so startup commands validate their
-arguments and then fail with actionable not-implemented messages.
+The CLI can migrate SQLite storage and start the WSGI `/v1` API used for manual capture and
+search. Long-running server commands validate configuration, apply pending SQLite migrations,
+print the local API URL, and then serve requests until stopped by the operator.
 
 | Command | Purpose | Current behavior |
 | --- | --- | --- |
-| `uv run idea-inbox dev [--host 127.0.0.1] [--port 8080]` | Start the local development API using SQLite and mock/local providers by default. | Parses options, then exits `1` because API startup is not implemented yet. |
+| `uv run idea-inbox dev [--host 127.0.0.1] [--port 8080] [--database ./data/idea-inbox.sqlite3]` | Start the local development API using SQLite and mock/local providers by default. | Applies SQLite migrations, serves `/v1/ideas` and `/v1/ideas/search`, and exits when stopped. |
 | `uv run idea-inbox migrate [--database ./data/idea-inbox.sqlite3]` | Apply deterministic SQLite storage migrations, including the FTS5 projection. | Applies migrations and exits `0`; exits `1` with an actionable error if configuration is invalid, SQLite FTS5 is unavailable, or a migration fails. |
-| `uv run idea-inbox serve [--host 127.0.0.1] [--port 8080]` | Start the configured `/v1` API for local or self-hosted use. | Parses options, then exits `1` because API server startup is not implemented yet. |
+| `uv run idea-inbox serve [--host 127.0.0.1] [--port 8080] [--database ./data/idea-inbox.sqlite3]` | Start the configured `/v1` API for local or self-hosted use. | Applies SQLite migrations, serves `/v1/ideas` and `/v1/ideas/search`, and exits when stopped. |
 
 Help and validation:
 
@@ -185,8 +188,8 @@ Troubleshooting:
 
 - `uv: command not found`: install uv from the official installer, or use the virtualenv
   fallback in [Contributing](CONTRIBUTING.md).
-- A not-implemented message from `dev`, `migrate`, or `serve` means the parser accepted the
-  command but the underlying runtime module is not built yet.
+- `Address already in use` from `dev` or `serve` means another process is already bound to the
+  requested host/port; choose another `--port` or stop the existing process.
 
 Planned self-hosting targets are documented in [Self-hosting](docs/self-hosting.md). Docker
 and Docker Compose support are planned deployment targets, but this repository does not yet
