@@ -132,7 +132,7 @@ Initial runtime data maps into SQLite as follows:
 
 | Existing or planned source | SQLite destination | Notes |
 | --- | --- | --- |
-| Manual `POST /v1/ideas` text, optional idempotency key, source ref, capture time, metadata | `raw_events`, `idea_drafts`, `ideas`, `idea_fts` | Store the request as a manual raw event first, derive one draft, persist one idea, then update FTS. |
+| Manual `POST /v1/ideas` text, source ref, capture time, metadata, tags, and planned optional idempotency key | `raw_events`, `idea_drafts`, `ideas`, `idea_fts` | Store the request as a manual raw event first, derive one draft, persist one idea, then update FTS. The current API generates a fresh source-scoped dedupe key per request, so replayed manual requests are not idempotent yet. |
 | Generic webhook event | `raw_events`, zero or more `idea_drafts`, zero or more `ideas`, `idea_fts` | Connector validation decides whether the event yields ideas; raw event remains even when ignored. |
 | Telegram/Discord/email provider message | `raw_events`, `idea_drafts`, `ideas`, `idea_fts` | Provider message IDs and source timestamps feed `provider_event_id`, `dedupe_key`, `occurred_at`, and `captured_at`. |
 | Query/search evidence | `ideas`, `idea_fts`, later `embeddings` | Search indexes return ranked IDs/snippets; answers cite stored `ideas`. |

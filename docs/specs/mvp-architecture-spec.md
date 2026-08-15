@@ -315,7 +315,10 @@ answer(query, limit, filters) -> QueryAnswer(answer, citations, hits)
 
 ## API design
 
-All public endpoints use `/v1`, Pydantic schemas, paginated list responses, and the standard error shape from `CONTRIBUTING.md`.
+All public endpoints use `/v1` and the standard error shape from `CONTRIBUTING.md`. The current
+runtime dependency-free WSGI implementation performs manual boundary validation with dataclass
+request DTOs instead of Pydantic schemas; keep that stdlib path until an external schema/framework
+dependency is explicitly accepted. List/search endpoints use paginated response envelopes.
 
 ### Manual capture
 
@@ -354,7 +357,24 @@ Response `201 Created`:
 
 The manual capture API boundary intentionally returns the newly captured `item` only. Raw event lineage and duplicate/idempotency bookkeeping remain persisted internally by the ingestion/storage layer and can be exposed by later dedicated read or audit endpoints if the MVP needs them. This keeps the public manual-create response aligned with the accepted strict-xfail contract in `tests/test_api_manual_ideas.py` while preserving the raw event → idea persistence requirement.
 
-Manual capture should accept an optional idempotency key header. When the same key is replayed for the same source, it should return the existing item without creating duplicate raw events or ideas.
+Implemented validation behavior:
+
+- The request body must be a JSON object.
+- `text` is required, trimmed, and must be a non-empty string no longer than 10,000 characters.
+- `source_ref`, `actor_ref`, and `captured_at` are optional strings; blank values normalize to
+  `null`, and `source_ref`/`actor_ref` are limited to 512 characters. `captured_at` is currently
+  stored as a caller-provided string when present; strict timestamp parsing is deferred.
+- `metadata` is optional and must be a JSON object.
+- `tags` is optional and must be a JSON list of strings. Tags are trimmed, lower-cased,
+  de-duplicated in first-seen order, ignore blank entries, allow at most 50 submitted items, and
+  each normalized tag is limited to 64 characters.
+- Validation failures return `400 VALIDATION_ERROR` with the failing field in
+  `error.details.field`; storage failures return `500 STORAGE_ERROR` without exposing internals.
+
+Known MVP limitations: manual capture does not yet accept or enforce an idempotency-key header,
+so replayed requests create new raw events and ideas; the endpoint also has no application-level
+access-token gate yet and should be bound to localhost or protected by external network controls
+when self-hosted.
 
 ### Generic connector ingestion
 

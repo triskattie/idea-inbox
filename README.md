@@ -28,9 +28,9 @@ See [Development with Hermes Agent](docs/development-with-hermes.md) for the col
 ## Development status
 
 This repository now has a runnable local SQLite path, deterministic migrations, an importable
-WSGI API for manual capture and FTS-backed search, and parsed CLI startup commands. Long-running
-`dev` and `serve` process startup, external connectors, provider-backed answer generation, and
-packaged deployment assets are still planned. See:
+WSGI API for manual capture and FTS-backed search, and `dev`/`serve` commands that start the
+local API after applying pending migrations. External connectors, provider-backed answer
+generation, and packaged deployment assets are still planned. See:
 
 - [Development standards](CONTRIBUTING.md)
 - [Architecture overview](docs/architecture.md)
@@ -101,10 +101,20 @@ trimmed; blank tags are ignored; tags are lower-cased and de-duplicated; metadat
 object. Validation failures return the standard `400 VALIDATION_ERROR` response with the
 actionable field in `error.details.field`.
 
+Field limits in the MVP are: `text` up to 10,000 characters, `source_ref` and `actor_ref` up to
+512 characters each, at most 50 tags, and each tag up to 64 characters after trimming. `tags`
+must be a JSON list of strings. `captured_at` is currently accepted as a trimmed string and used
+as the idea capture time when present; strict ISO-8601 parsing is not enforced yet.
+
 Successful manual capture stores the normalized request as a `manual` raw event first, then
 persists one idea draft and one canonical idea for search/citation lineage. The public response
 returns the created idea id, normalized text, source metadata, capture timestamp, metadata, and
 tags without exposing persistence internals.
+
+Known MVP limitations: manual capture has no dedicated auth/access-token gate yet, replayed
+manual requests are not idempotent because each request receives a new source-scoped dedupe key,
+and there is no direct `idea-inbox capture` CLI wrapper; use the `/v1` HTTP API through `dev` or
+`serve`.
 
 ## FTS-backed search
 
@@ -155,6 +165,25 @@ uv run idea-inbox
 Run this from the repository root after `uv sync`. It prints top-level CLI help and exits `0`.
 It does not start an API server, create or migrate a database, call model providers, open
 network listeners, or emit telemetry.
+
+To try the current manual capture flow locally, start the API against a disposable SQLite file:
+
+```bash
+uv run idea-inbox serve --host 127.0.0.1 --port 8080 --database ./data/idea-inbox.sqlite3
+```
+
+Then submit a manual idea from another terminal:
+
+```bash
+curl -i -X POST http://127.0.0.1:8080/v1/ideas \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Prototype local-first capture before connector work.","source_ref":"note-1","actor_ref":"local-operator","tags":["Capture","local-ai"],"metadata":{"surface":"curl"}}'
+```
+
+The server responds `201 Created` with an `item` containing the generated `idea_id`, normalized
+text, `source: "manual"`, optional source metadata, capture timestamp, metadata, and normalized
+tags. The submitted payload is saved as a `manual` raw event before the derived draft and
+canonical idea are persisted.
 
 ### Startup commands
 
