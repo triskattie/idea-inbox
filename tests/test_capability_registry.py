@@ -19,6 +19,34 @@ def test_builtin_registry_reports_enabled_baseline_and_disabled_query_ai() -> No
     assert registry.is_enabled("query-ai") is False
 
 
+def test_installed_capability_defaulting_disabled_stays_inert() -> None:
+    provider = Capability(
+        name="hosted-model-provider",
+        kind=CapabilityKind.PROVIDER,
+        dependencies=("core",),
+        default_enabled=False,
+        configuration=(
+            ConfigRequirement(
+                key="IDEA_INBOX_HOSTED_MODEL_TOKEN",
+                required_when_enabled=True,
+                secret=True,
+                description="Hosted model credential handle.",
+            ),
+        ),
+    )
+    registry = CapabilityRegistry(installed_capabilities=(provider,), config_values={})
+
+    record = registry.get_capability("hosted-model-provider")
+
+    assert record is not None
+    assert record.origin == "installed"
+    assert record.default_enabled is False
+    assert record.effective_enabled is False
+    assert record.status == "disabled"
+    assert record.diagnostics == []
+    assert registry.is_enabled("hosted-model-provider") is False
+
+
 def test_enabled_capability_reports_missing_secret_configuration_without_value() -> None:
     provider = Capability(
         name="openai-compatible-provider",
@@ -125,3 +153,44 @@ def test_cycle_participants_are_reported_as_misconfigured() -> None:
             "message": "Capability dependency cycle includes beta-module.",
         }
     ]
+
+
+def test_valid_installed_capability_with_enabled_dependencies_reports_enabled() -> None:
+    provider = Capability(
+        name="local-model-provider",
+        kind=CapabilityKind.PROVIDER,
+        dependencies=("core",),
+        default_enabled=True,
+        configuration=(
+            ConfigRequirement(
+                key="IDEA_INBOX_LOCAL_MODEL_URL",
+                required_when_enabled=True,
+                secret=False,
+                description="Local model API endpoint.",
+            ),
+        ),
+    )
+    query = Capability(
+        name="local-ai-query",
+        kind=CapabilityKind.QUERY,
+        dependencies=("sqlite-fts-search", "local-model-provider"),
+        default_enabled=True,
+    )
+    registry = CapabilityRegistry(
+        installed_capabilities=(provider, query),
+        config_values={"IDEA_INBOX_LOCAL_MODEL_URL": "http://127.0.0.1:11434"},
+    )
+
+    provider_record = registry.get_capability("local-model-provider")
+    query_record = registry.get_capability("local-ai-query")
+
+    assert provider_record is not None
+    assert query_record is not None
+    assert provider_record.origin == "installed"
+    assert provider_record.status == "enabled"
+    assert provider_record.diagnostics == []
+    assert query_record.origin == "installed"
+    assert query_record.status == "enabled"
+    assert query_record.effective_enabled is True
+    assert query_record.diagnostics == []
+    assert registry.is_enabled("local-ai-query") is True
