@@ -388,15 +388,24 @@ class SQLiteStorageBackend:
         ).fetchone()
         return None if row is None else _idea_from_row(row)
 
-    def list_ideas(self, *, limit: int = 50, offset: int = 0) -> list[Idea]:
+    def list_ideas(
+        self, *, raw_event_id: str | None = None, limit: int = 50, offset: int = 0
+    ) -> list[Idea]:
+        raw_event_filter = ""
+        parameters: list[object] = []
+        if raw_event_id is not None:
+            raw_event_filter = "AND raw_event_id = ?"
+            parameters.append(raw_event_id)
+        parameters.extend([limit, offset])
         rows = self._connection.execute(
-            """
+            f"""
             SELECT * FROM ideas
             WHERE deleted_at IS NULL
+            {raw_event_filter}
             ORDER BY captured_at DESC, id ASC
             LIMIT ? OFFSET ?
             """,
-            (limit, offset),
+            tuple(parameters),
         ).fetchall()
         return [_idea_from_row(row) for row in rows]
 

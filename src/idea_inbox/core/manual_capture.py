@@ -27,6 +27,7 @@ class ManualIdeaPayload:
     """Normalized manual idea payload accepted by API and server actions."""
 
     text: str
+    idempotency_key: str | None = None
     source_ref: str | None = None
     actor_ref: str | None = None
     captured_at: str | None = None
@@ -56,6 +57,7 @@ def validate_manual_idea_payload(body: Any) -> ManualIdeaPayload:
 
     return ManualIdeaPayload(
         text=text,
+        idempotency_key=_optional_string(body, "idempotency_key"),
         source_ref=_optional_string(body, "source_ref"),
         actor_ref=_optional_string(body, "actor_ref"),
         captured_at=_optional_string(body, "captured_at"),

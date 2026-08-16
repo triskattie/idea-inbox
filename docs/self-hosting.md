@@ -93,9 +93,9 @@ Operational notes:
 - The projection is kept synchronized by SQLite triggers on `ideas` insert, update, and delete.
   Raw events remain stored even when a derived idea is deleted.
 - Manual capture currently runs through the WSGI API at `POST /v1/ideas`; the endpoint accepts a
-  JSON object with required non-empty `text` plus optional `source_ref`, `actor_ref`,
-  `captured_at`, `metadata`, and `tags`. It stores a `manual` raw event before the derived draft
-  and canonical idea, then returns `201 Created` with the created `item`.
+  JSON object with required non-empty `text` plus optional `idempotency_key`, `source_ref`,
+  `actor_ref`, `captured_at`, `metadata`, and `tags`. It stores a `manual` raw event before the
+  derived draft and canonical idea, then returns `201 Created` with the created `item`.
 - Search currently runs through the same API at `GET /v1/ideas/search?q=...&limit=10`.
 - The CLI `dev` and `serve` commands apply pending SQLite migrations, bind the configured host
   and port, and serve the `/v1` API until stopped. Deployment packaging still needs a Dockerfile,
@@ -106,8 +106,8 @@ MVP exposure notes:
 - Bind to `127.0.0.1` unless you have deliberately put your own reverse proxy, network ACL, or
   other access control in front of the process. The manual API does not yet enforce an
   application-level access token.
-- Replayed manual `POST /v1/ideas` requests currently create new raw events and ideas; the
-  planned source/idempotency-key replay behavior has not landed yet.
+- Replayed manual `POST /v1/ideas` requests are idempotent by `idempotency_key` when supplied, or
+  by a dedupe key derived from the normalized request body when no key is supplied.
 
 ## Resetting a local development database
 

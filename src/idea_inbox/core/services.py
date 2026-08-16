@@ -25,12 +25,13 @@ def create_manual_idea(storage: StorageBackend, payload: ManualIdeaPayload) -> M
     now = _utc_now()
     captured_at = payload.captured_at or now
     raw_payload = _manual_payload(payload)
+    dedupe_key = payload.idempotency_key or sha256(raw_payload.encode("utf-8")).hexdigest()
     raw_event = storage.save_raw_event(
         RawEvent(
             id=_new_id("raw"),
             source="manual",
             provider_event_id=None,
-            dedupe_key=_new_id("manual"),
+            dedupe_key=dedupe_key,
             received_at=now,
             occurred_at=payload.captured_at,
             actor_ref=payload.actor_ref,
@@ -39,6 +40,17 @@ def create_manual_idea(storage: StorageBackend, payload: ManualIdeaPayload) -> M
             processing_state="pending",
         )
     )
+    existing_ideas = storage.list_ideas(raw_event_id=raw_event.id, limit=1)
+    if existing_ideas:
+        existing_idea = existing_ideas[0]
+        existing_draft = (
+            storage.get_idea_draft(existing_idea.draft_id) if existing_idea.draft_id else None
+        )
+        if existing_draft is None:
+            existing_drafts = storage.list_idea_drafts(raw_event_id=raw_event.id, limit=1)
+            existing_draft = existing_drafts[0]
+        return ManualIdeaResult(raw_event=raw_event, draft=existing_draft, idea=existing_idea)
+
     draft = storage.save_idea_draft(
         IdeaDraft(
             id=_new_id("draft"),
@@ -74,6 +86,7 @@ def _manual_payload(payload: ManualIdeaPayload) -> str:
     return json.dumps(
         {
             "text": payload.text,
+            "idempotency_key": payload.idempotency_key,
             "source_ref": payload.source_ref,
             "actor_ref": payload.actor_ref,
             "captured_at": payload.captured_at,

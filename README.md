@@ -102,25 +102,28 @@ POST /v1/ideas
 ```
 
 The JSON request body must be an object with non-empty string `text`. Optional fields are
-`source_ref`, `actor_ref`, `captured_at`, `metadata`, and `tags`. Text and string references are
-trimmed; blank tags are ignored; tags are lower-cased and de-duplicated; metadata must be a JSON
-object. Validation failures return the standard `400 VALIDATION_ERROR` response with the
-actionable field in `error.details.field`.
+`idempotency_key`, `source_ref`, `actor_ref`, `captured_at`, `metadata`, and `tags`. Text,
+idempotency keys, and string references are trimmed; blank tags are ignored; tags are lower-cased
+and de-duplicated; metadata must be a JSON object. Validation failures return the standard
+`400 VALIDATION_ERROR` response with the actionable field in `error.details.field`.
 
-Field limits in the MVP are: `text` up to 10,000 characters, `source_ref` and `actor_ref` up to
-512 characters each, at most 50 tags, and each tag up to 64 characters after trimming. `tags`
-must be a JSON list of strings. `captured_at` is currently accepted as a trimmed string and used
-as the idea capture time when present; strict ISO-8601 parsing is not enforced yet.
+Field limits in the MVP are: `text` up to 10,000 characters, `idempotency_key`, `source_ref`, and
+`actor_ref` up to 512 characters each, at most 50 tags, and each tag up to 64 characters after
+trimming. `tags` must be a JSON list of strings. `captured_at` is currently accepted as a trimmed
+string and used as the idea capture time when present; strict ISO-8601 parsing is not enforced yet.
 
 Successful manual capture stores the normalized request as a `manual` raw event first, then
 persists one idea draft and one canonical idea for search/citation lineage. The public response
 returns the created idea id, normalized text, source metadata, capture timestamp, metadata, and
 tags without exposing persistence internals.
 
-Known MVP limitations: manual capture has no dedicated auth/access-token gate yet, replayed
-manual requests are not idempotent because each request receives a new source-scoped dedupe key,
-and there is no direct `idea-inbox capture` CLI wrapper; use the `/v1` HTTP API through `dev` or
-`serve`.
+Manual capture is idempotent by source-scoped dedupe key. If `idempotency_key` is supplied,
+replays with the same key return the originally stored idea without creating another raw event,
+draft, or idea. If no key is supplied, Idea Inbox derives the dedupe key from the normalized
+request body so exact request replays are also idempotent.
+
+Known MVP limitations: manual capture has no dedicated auth/access-token gate yet, and there is no
+direct `idea-inbox capture` CLI wrapper; use the `/v1` HTTP API through `dev` or `serve`.
 
 ## FTS-backed search
 

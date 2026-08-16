@@ -169,6 +169,64 @@ def test_manual_idea_create_endpoint_trims_reusable_payload_fields(tmp_path: Pat
     assert payload["item"]["tags"] == ["local-ai", "capture"]
 
 
+def test_manual_idea_create_endpoint_replays_duplicate_request_idempotently(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "ideas.sqlite3"
+    app = create_app(database_path=database_path)
+    body = {
+        "text": "Replay should return the existing idea.",
+        "source_ref": "manual-note-3",
+        "actor_ref": "local-operator",
+        "tags": ["capture"],
+    }
+
+    first_status, _headers, first_payload = request(app, "/v1/ideas", json_body=body)
+    second_status, _headers, second_payload = request(app, "/v1/ideas", json_body=body)
+
+    assert first_status == "201 Created"
+    assert second_status == "201 Created"
+    assert second_payload == first_payload
+
+    storage = SQLiteStorageBackend(database_path)
+    try:
+        raw_count = storage.count_raw_events()
+        ideas = storage.list_ideas()
+    finally:
+        storage.close()
+    assert raw_count == 1
+    assert [idea.id for idea in ideas] == [first_payload["item"]["idea_id"]]
+
+
+def test_manual_idea_create_endpoint_accepts_idempotency_key(tmp_path: Path) -> None:
+    database_path = tmp_path / "ideas.sqlite3"
+    app = create_app(database_path=database_path)
+
+    first_status, _headers, first_payload = request(
+        app,
+        "/v1/ideas",
+        json_body={"text": "Original body", "idempotency_key": "manual-key-1"},
+    )
+    second_status, _headers, second_payload = request(
+        app,
+        "/v1/ideas",
+        json_body={"text": "Retried changed body", "idempotency_key": "manual-key-1"},
+    )
+
+    assert first_status == "201 Created"
+    assert second_status == "201 Created"
+    assert second_payload == first_payload
+
+    storage = SQLiteStorageBackend(database_path)
+    try:
+        raw_rows = storage.connection.execute("SELECT dedupe_key FROM raw_events").fetchall()
+        ideas = storage.list_ideas()
+    finally:
+        storage.close()
+    assert [row["dedupe_key"] for row in raw_rows] == ["manual-key-1"]
+    assert [idea.text for idea in ideas] == ["Original body"]
+
+
 def test_manual_idea_create_endpoint_rejects_malformed_optional_fields(tmp_path: Path) -> None:
     app = create_app(database_path=tmp_path / "ideas.sqlite3")
 
