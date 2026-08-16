@@ -47,6 +47,7 @@ def test_create_manual_idea_persists_raw_event_draft_and_idea(
     assert raw_event.processing_state == "processed"
     assert json.loads(raw_event.payload) == {
         "text": "Prototype local-first manual capture.",
+        "idempotency_key": None,
         "source_ref": "manual-note-1",
         "actor_ref": "local-operator",
         "captured_at": None,
@@ -73,6 +74,46 @@ def test_create_manual_idea_uses_supplied_capture_timestamp(storage: SQLiteStora
     assert result.raw_event.occurred_at == "2026-08-14T20:00:00Z"
     assert result.draft.source_created_at == "2026-08-14T20:00:00Z"
     assert result.idea.captured_at == "2026-08-14T20:00:00Z"
+
+
+def test_create_manual_idea_is_idempotent_for_duplicate_manual_payload(
+    storage: SQLiteStorageBackend,
+) -> None:
+    payload = ManualIdeaPayload(
+        text="Keep manual capture idempotent.",
+        source_ref="manual-note-1",
+        actor_ref="local-operator",
+        captured_at="2026-08-14T20:00:00Z",
+        metadata={"surface": "service-test"},
+        tags=("capture",),
+    )
+
+    first = create_manual_idea(storage, payload)
+    duplicate = create_manual_idea(storage, payload)
+
+    assert duplicate.raw_event.id == first.raw_event.id
+    assert duplicate.draft.id == first.draft.id
+    assert duplicate.idea.id == first.idea.id
+    assert storage.count_raw_events() == 1
+    assert storage.list_idea_drafts(raw_event_id=first.raw_event.id) == [first.draft]
+    assert [idea.id for idea in storage.list_ideas()] == [first.idea.id]
+
+
+def test_create_manual_idea_uses_explicit_idempotency_key(storage: SQLiteStorageBackend) -> None:
+    first = create_manual_idea(
+        storage,
+        ManualIdeaPayload(text="Original captured text.", idempotency_key="manual-key-1"),
+    )
+    duplicate = create_manual_idea(
+        storage,
+        ManualIdeaPayload(text="Changed retry body.", idempotency_key="manual-key-1"),
+    )
+
+    assert duplicate.raw_event.id == first.raw_event.id
+    assert duplicate.idea.id == first.idea.id
+    assert duplicate.idea.text == "Original captured text."
+    assert storage.count_raw_events() == 1
+    assert [idea.text for idea in storage.list_ideas()] == ["Original captured text."]
 
 
 def test_validate_manual_idea_payload_rejects_blank_text_before_storage(
