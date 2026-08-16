@@ -1,5 +1,12 @@
+import pytest
+
 from idea_inbox.capabilities.registry import CapabilityRegistry, builtin_capabilities
-from idea_inbox.core.capabilities import Capability, CapabilityKind, ConfigRequirement
+from idea_inbox.core.capabilities import (
+    Capability,
+    CapabilityKind,
+    CapabilityValidationError,
+    ConfigRequirement,
+)
 
 
 def test_builtin_registry_reports_enabled_baseline_and_disabled_query_ai() -> None:
@@ -194,3 +201,54 @@ def test_valid_installed_capability_with_enabled_dependencies_reports_enabled() 
     assert query_record.effective_enabled is True
     assert query_record.diagnostics == []
     assert registry.is_enabled("local-ai-query") is True
+
+
+def test_duplicate_installed_capability_names_are_rejected() -> None:
+    first = Capability(
+        name="duplicate-provider",
+        kind=CapabilityKind.PROVIDER,
+    )
+    second = Capability(
+        name="duplicate-provider",
+        kind=CapabilityKind.PROVIDER,
+    )
+
+    with pytest.raises(CapabilityValidationError, match="duplicate capability name"):
+        CapabilityRegistry(installed_capabilities=(first, second))
+
+
+def test_installed_capability_cannot_shadow_builtin_capability() -> None:
+    shadow_core = Capability(
+        name="core",
+        kind=CapabilityKind.CONNECTOR,
+        default_enabled=False,
+    )
+
+    with pytest.raises(CapabilityValidationError, match="duplicate capability name: core"):
+        CapabilityRegistry(installed_capabilities=(shadow_core,))
+
+
+def test_sqlite_storage_reports_invalid_database_configuration() -> None:
+    registry = CapabilityRegistry(
+        config_values={
+            "IDEA_INBOX_DATABASE_URL": "postgresql://localhost/idea_inbox",
+            "IDEA_INBOX_SQLITE_PATH": "/tmp/idea-inbox.sqlite3",
+        }
+    )
+
+    storage = registry.get_capability("sqlite-storage")
+    capture = registry.get_capability("manual-capture")
+    search = registry.get_capability("sqlite-fts-search")
+
+    assert storage is not None
+    assert capture is not None
+    assert search is not None
+    assert storage.status == "misconfigured"
+    assert {
+        "code": "invalid_configuration",
+        "field": "IDEA_INBOX_DATABASE_URL",
+        "message": "Set only one of IDEA_INBOX_DATABASE_URL or IDEA_INBOX_SQLITE_PATH.",
+    } in storage.diagnostics
+    assert capture.status == "misconfigured"
+    assert search.status == "misconfigured"
+    assert registry.is_enabled("sqlite-storage") is False

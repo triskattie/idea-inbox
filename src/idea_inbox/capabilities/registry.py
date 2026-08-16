@@ -4,7 +4,7 @@ import os
 from collections.abc import Iterable, Mapping
 from dataclasses import replace
 
-from idea_inbox.config import DATABASE_URL_ENV, SQLITE_PATH_ENV
+from idea_inbox.config import DATABASE_URL_ENV, SQLITE_PATH_ENV, ConfigError, load_config
 from idea_inbox.core.capabilities import (
     Capability,
     CapabilityKind,
@@ -12,6 +12,7 @@ from idea_inbox.core.capabilities import (
     CapabilityRecord,
     CapabilityRegistryReport,
     CapabilityStatus,
+    CapabilityValidationError,
     ConfigRequirement,
 )
 
@@ -190,6 +191,9 @@ class CapabilityRegistry:
                         )
 
                 diagnostics.extend(_configuration_diagnostics(capability, self._config_values))
+                diagnostics.extend(
+                    _builtin_configuration_diagnostics(capability, self._config_values)
+                )
                 status = CapabilityStatus.MISCONFIGURED if diagnostics else CapabilityStatus.ENABLED
 
             record = CapabilityRecord(
@@ -222,11 +226,15 @@ def _capability_map(
 ) -> CapabilityMap:
     capabilities: CapabilityMap = {}
     for capability in built_in_capabilities:
+        if capability.name in capabilities:
+            raise CapabilityValidationError(f"duplicate capability name: {capability.name}")
         capabilities[capability.name] = (
             replace(capability, owner="builtin"),
             CapabilityOrigin.BUILT_IN,
         )
     for capability in installed_capabilities:
+        if capability.name in capabilities:
+            raise CapabilityValidationError(f"duplicate capability name: {capability.name}")
         capabilities[capability.name] = (capability, CapabilityOrigin.INSTALLED)
     return capabilities
 
@@ -250,6 +258,24 @@ def _configuration_diagnostics(
             }
         )
     return diagnostics
+
+
+def _builtin_configuration_diagnostics(
+    capability: Capability, config_values: Mapping[str, str]
+) -> list[dict[str, str]]:
+    if capability.name != "sqlite-storage":
+        return []
+    try:
+        load_config(env=config_values)
+    except ConfigError as exc:
+        return [
+            {
+                "code": "invalid_configuration",
+                "field": DATABASE_URL_ENV,
+                "message": str(exc),
+            }
+        ]
+    return []
 
 
 def _cycle_members(capabilities: CapabilityMap) -> set[str]:
