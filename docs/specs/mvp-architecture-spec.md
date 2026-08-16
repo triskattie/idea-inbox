@@ -15,6 +15,7 @@ This spec consolidates the repository discovery in
 - [`../providers.md`](../providers.md)
 - [`../self-hosting.md`](../self-hosting.md)
 - [`sqlite-schema-plan.md`](sqlite-schema-plan.md)
+- [`capability-registry-spec.md`](capability-registry-spec.md)
 - [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md)
 - [`../decisions/ADR-001-connector-and-provider-boundaries.md`](../decisions/ADR-001-connector-and-provider-boundaries.md)
 - [`../decisions/ADR-002-sqlite-default-postgres-production.md`](../decisions/ADR-002-sqlite-default-postgres-production.md)
@@ -490,6 +491,11 @@ architecture must keep optional features from becoming implicit core requirement
 ### Phase 5: Capability/module contract and registry
 
 Goal: make module-ability explicit before adding AI query or heavier integrations.
+
+Implementation workers should follow the dedicated
+[`capability-registry-spec.md`](capability-registry-spec.md) for the metadata shape, lifecycle
+vocabulary, dependency/configuration validation rules, registry API contract, and example
+capability records.
 
 Acceptance criteria:
 

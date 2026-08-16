@@ -213,6 +213,7 @@ def test_docs_define_optional_module_direction_before_ai_query() -> None:
     architecture = read_doc("docs/architecture.md")
     mvp_spec = read_doc("docs/specs/mvp-architecture-spec.md")
     adr = read_doc("docs/decisions/ADR-007-optional-capability-modules.md")
+    capability_spec = read_doc("docs/specs/capability-registry-spec.md")
     contributing = read_doc("CONTRIBUTING.md")
 
     assert "## Optional module roadmap" in readme
@@ -227,5 +228,19 @@ def test_docs_define_optional_module_direction_before_ai_query() -> None:
         "### Phase 6: Optional cited query capability"
     )
     assert "ADR-007-optional-capability-modules.md" in mvp_spec
+    assert "capability-registry-spec.md" in mvp_spec
     assert "AI is not a prerequisite for installation, startup, tests, or basic self-hosting" in adr
     assert "opt-in capabilities, not base-app prerequisites" in contributing
+
+    assert "## Capability metadata shape" in capability_spec
+    assert "## Lifecycle and status vocabulary" in capability_spec
+    assert "## Registry API contract" in capability_spec
+    assert "## Example capability record" in capability_spec
+    assert "`query-ai`" in capability_spec
+    assert "built-in" in capability_spec
+    assert "installed" in capability_spec
+    assert "enabled" in capability_spec
+    assert "disabled" in capability_spec
+    assert "unavailable" in capability_spec
+    assert "misconfigured" in capability_spec
+    assert "No AI query endpoint, model calls, embeddings" in capability_spec
