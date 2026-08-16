@@ -4,6 +4,13 @@ Providers supply model, embedding, and credential capabilities without leaking p
 
 ## Model providers
 
+Current implementation status: model and embedding provider config keys are reserved but not
+loaded by `src/idea_inbox/config.py` yet. `.env.example` includes
+`IDEA_INBOX_CHAT_PROVIDER`, `IDEA_INBOX_EMBEDDING_PROVIDER`, `IDEA_INBOX_OPENAI_BASE_URL`,
+`IDEA_INBOX_OPENAI_API_KEY`, `IDEA_INBOX_OPENAI_CHAT_MODEL`, and
+`IDEA_INBOX_OPENAI_EMBEDDING_MODEL` to show the planned shape; setting them does not enable
+provider-backed answer generation in the current runtime.
+
 The core must not assume OpenAI API keys. Supported paths should include:
 
 - mock provider for tests

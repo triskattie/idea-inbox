@@ -70,6 +70,12 @@ Configure the database location with one of these settings:
 Do not set `IDEA_INBOX_DATABASE_URL` and `IDEA_INBOX_SQLITE_PATH` together; startup and
 migration commands reject conflicting database location settings.
 
+Other keys in `.env.example` are reserved for planned providers, connectors, and an API access
+token gate. The current runtime only loads `IDEA_INBOX_ENV`, `IDEA_INBOX_LOG_LEVEL`,
+`IDEA_INBOX_DATABASE_URL`, and `IDEA_INBOX_SQLITE_PATH`; setting `IDEA_INBOX_API_KEY` does not
+protect `POST /v1/ideas` yet. Keep `serve` bound to `127.0.0.1` or put your own reverse proxy,
+network ACL, or access control in front of it before exposing the API.
+
 Initialize or update the schema with:
 
 ```bash

@@ -52,6 +52,12 @@ If `IDEA_INBOX_DATABASE_URL` and `IDEA_INBOX_SQLITE_PATH` are both set, configur
 fails before migrations run. The MVP backend rejects non-SQLite URLs such as Postgres until a
 separate Postgres storage adapter is implemented.
 
+The current runtime also loads `IDEA_INBOX_ENV` and `IDEA_INBOX_LOG_LEVEL`. Provider, connector,
+and API-token-looking keys in `.env.example` are reserved for planned work and are not enforced by
+today's WSGI API. In particular, setting `IDEA_INBOX_API_KEY` does not protect `POST /v1/ideas`
+yet; bind to `127.0.0.1` or add your own reverse proxy, network ACL, or access-control layer
+before exposing `dev` or `serve` beyond the local host.
+
 ## Current SQLite migrations and search index
 
 SQLite is the current runnable persistence path. Apply migrations with:

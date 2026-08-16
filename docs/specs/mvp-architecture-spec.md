@@ -137,6 +137,12 @@ parses `dev`, `migrate`, and `serve`; `idea-inbox migrate` applies deterministic
 migrations for the configured database or an explicit `--database` path; and `idea-inbox dev` /
 `idea-inbox serve` start the WSGI API after applying pending migrations.
 
+Current configuration loading is intentionally narrower than the full planned MVP surface: only
+`IDEA_INBOX_ENV`, `IDEA_INBOX_LOG_LEVEL`, `IDEA_INBOX_DATABASE_URL`, and
+`IDEA_INBOX_SQLITE_PATH` are implemented. Provider, connector, and API-token keys in
+`.env.example` are reserved/no-op until their adapters and access gates land; setting
+`IDEA_INBOX_API_KEY` does not protect `POST /v1/ideas` in the current runtime.
+
 User-facing docs distinguish the smoke command (`uv run idea-inbox`), the runnable migration
 command, the importable WSGI app surface, and the long-running CLI startup commands. Direct
 content-management CLI commands such as `idea-inbox capture`, `idea-inbox search`, and
@@ -595,10 +601,12 @@ Assumptions:
 - Model providers may receive retrieved idea text unless a local/mock provider is configured.
 - Hosted model use is optional and must be visible in configuration.
 
-Requirements:
+Target requirements:
 
 - No secrets in repository files, logs, test fixtures, or errors.
-- Manual/API access requires an operator-configured credential before network exposure.
+- Manual/API access requires an operator-configured credential before network exposure; this is
+  not implemented in the current WSGI API, so current docs require local binding or external
+  access control before exposing `dev` or `serve`.
 - Webhook/connector endpoints validate signatures or tokens where the source supports them.
 - Stored raw payloads are preserved for audit/reprocessing but should not be returned by default list/query endpoints.
 - Error responses expose safe codes/messages, not raw stack traces or secrets.
@@ -688,6 +696,11 @@ Configuration should cover:
 - Model provider type, base URL, model name, and credential provider reference.
 - Embedding provider type, model name, and credential provider reference.
 - Telegram, Discord, email, and webhook credentials/settings when those connectors are enabled.
+
+Current implementation status: `src/idea_inbox/config.py` implements only environment, log level,
+and SQLite database location settings. The API/manual access token, provider selectors, OpenAI
+compatible settings, and Telegram/Discord/email connector settings are reserved in `.env.example`
+but are no-ops until their runtime gates/adapters are implemented.
 
 ## MVP implementation phases
 

@@ -19,6 +19,12 @@ Connectors may depend on core domain contracts, but core domain code must not de
 - Manual API (`POST /v1/ideas`) stores user-submitted ideas as `manual` raw events before
   creating derived drafts and canonical ideas.
 
+Current implementation status: `.env.example` includes planned connector/auth keys, but only the
+manual API runtime exists today. `IDEA_INBOX_API_KEY` is not enforced by `POST /v1/ideas` yet, and
+`IDEA_INBOX_TELEGRAM_BOT_TOKEN`, `IDEA_INBOX_DISCORD_BOT_TOKEN`, `IDEA_INBOX_EMAIL_IMAP_URL`,
+`IDEA_INBOX_EMAIL_USERNAME`, and `IDEA_INBOX_EMAIL_PASSWORD` are reserved until those connector
+runtimes land.
+
 ## Planned connectors
 
 - Generic webhook
