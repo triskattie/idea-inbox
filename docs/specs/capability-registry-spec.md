@@ -2,7 +2,9 @@
 
 ## Status
 
-Draft for Phase 5 implementation.
+Implemented in Phase 5 for the SDK-free metadata contract and in-process registry. Later phases may
+add public HTTP/CLI surfaces, package discovery, provider implementations, connector runtimes,
+secret persistence, or OAuth/device-login flows, but those are not part of this phase.
 
 ## Objective
 
@@ -97,6 +99,15 @@ src/idea_inbox/capabilities/registry.py   Built-in metadata and validation orche
 
 Do not put provider SDK imports, connector SDK imports, or plugin package discovery in `idea_inbox.core`.
 
+The implemented files are:
+
+- `src/idea_inbox/core/capabilities.py`: `Capability`, `ConfigRequirement`, `CapabilityRecord`,
+  `CapabilityRegistryReport`, and status/origin/kind enums.
+- `src/idea_inbox/capabilities/registry.py`: built-in capability metadata and
+  `CapabilityRegistry` validation orchestration.
+- `tests/test_capability_registry.py`: contract tests for defaults, installed capabilities,
+  dependency diagnostics, configuration diagnostics, unavailable references, and cycles.
+
 The registry service should expose:
 
 - `list_capabilities() -> list[CapabilityRecord]`: all known capabilities with origin, effective enabled state, status, and diagnostics.
@@ -105,6 +116,33 @@ The registry service should expose:
 - `validate() -> CapabilityRegistryReport`: full validation result with diagnostics and no side effects beyond reading configuration and metadata.
 
 A future HTTP or CLI surface can expose the same report shape, but Phase 5 does not require a public endpoint. If an endpoint is later added, it should be read-only and must redact secrets.
+
+Example installed capability registration:
+
+```python
+from idea_inbox.capabilities.registry import CapabilityRegistry
+from idea_inbox.core.capabilities import Capability, CapabilityKind, ConfigRequirement
+
+provider = Capability(
+    name="openai-compatible-provider",
+    kind=CapabilityKind.PROVIDER,
+    dependencies=("core",),
+    default_enabled=False,
+    configuration=(
+        ConfigRequirement(
+            key="IDEA_INBOX_OPENAI_API_KEY",
+            required_when_enabled=True,
+            secret=True,
+            description="OpenAI-compatible credential handle.",
+        ),
+    ),
+    description="Planned OpenAI-compatible model provider.",
+    owner="example-provider-package",
+)
+
+registry = CapabilityRegistry(installed_capabilities=(provider,))
+record = registry.get_capability("openai-compatible-provider")
+```
 
 ## Built-in baseline capabilities
 

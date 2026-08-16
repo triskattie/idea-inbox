@@ -244,3 +244,27 @@ def test_docs_define_optional_module_direction_before_ai_query() -> None:
     assert "unavailable" in capability_spec
     assert "misconfigured" in capability_spec
     assert "No AI query endpoint, model calls, embeddings" in capability_spec
+
+
+def test_docs_describe_implemented_capability_registry_contract() -> None:
+    readme = read_doc("README.md")
+    contributing = read_doc("CONTRIBUTING.md")
+    capability_spec = read_doc("docs/specs/capability-registry-spec.md")
+    squashed_readme = squash_whitespace(readme)
+    squashed_contributing = squash_whitespace(contributing)
+
+    assert "## Capability registry" in readme
+    assert "`CapabilityRegistry`" in readme
+    assert "`list_capabilities()`" in readme
+    assert "`effective_enabled`" in readme
+    assert "operator override if present, otherwise `default_enabled`" in squashed_readme
+    assert "This phase only makes capabilities explicit" in squashed_readme
+
+    assert "### Capability registry maintenance" in contributing
+    assert "lowercase kebab-case" in contributing
+    assert "`ConfigRequirement`" in contributing
+    assert "Do not add provider SDK imports" in squashed_contributing
+
+    assert "Implemented in Phase 5" in capability_spec
+    assert "`src/idea_inbox/capabilities/registry.py`" in capability_spec
+    assert "CapabilityRegistry(installed_capabilities=(provider,))" in capability_spec

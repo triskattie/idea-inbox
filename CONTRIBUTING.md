@@ -71,6 +71,32 @@ Rules:
 - No hidden network calls in constructors.
 - No secrets in logs.
 
+### Capability registry maintenance
+
+Capabilities are SDK-free metadata records, not adapter implementations. Declare them with
+`Capability` and `ConfigRequirement` from `idea_inbox.core.capabilities`, and register installed
+metadata through `CapabilityRegistry(installed_capabilities=...)` in application-level code. Do not
+add provider SDK imports, connector SDK imports, package discovery, network calls, migrations, or
+client startup to `idea_inbox.core` or to registry validation.
+
+Use stable lowercase kebab-case names because capability names are public API. Choose one of the
+current kinds: `core`, `query`, `provider`, `connector`, `search`, or `storage`. Keep dependencies
+as capability names, not Python packages or environment variables.
+
+Default enabled state is policy, not proof of readiness: `effective_enabled` is operator override
+if present, otherwise `default_enabled`. Base capabilities needed for the current local MVP may
+default to enabled; AI query, model/embedding providers, external connectors, vector search, hosted
+services, and heavier deployment profiles default to disabled until deliberately enabled.
+
+Configuration requirements should name public config keys or credential handles. Set
+`required_when_enabled=True` only when a missing value makes an enabled capability unusable, and
+set `secret=True` for credentials. Registry diagnostics may report a secret key as missing, but
+must never expose secret values.
+
+When adding or changing capability metadata, update `docs/specs/capability-registry-spec.md`, add
+or adjust tests in `tests/test_capability_registry.py`, and keep README terminology aligned with
+the implemented `CapabilityRegistry` API and status meanings.
+
 ### SQLite FTS search maintenance
 
 The current SQLite search index is `idea_fts`, a rebuildable FTS5 projection over canonical
