@@ -186,6 +186,71 @@ explicit module plan is:
 4. Keep core startup, migration, capture, and FTS search healthy when no optional modules are
    installed.
 
+## Capability registry
+
+The Phase 5 capability registry makes the module boundary explicit without adding AI query,
+embeddings, connector runtimes, provider SDKs, package discovery, or heavier integrations. This
+phase only makes capabilities explicit so later optional modules can be validated before startup;
+manual capture, SQLite storage, and FTS-backed keyword search remain the default runnable path.
+
+Capability metadata lives in SDK-free dataclasses under `idea_inbox.core.capabilities` and is
+validated by `CapabilityRegistry` in `idea_inbox.capabilities.registry`. Public capability names
+are stable lowercase kebab-case slugs. Current metadata fields are:
+
+| Field | Meaning |
+| --- | --- |
+| `name` | Stable public slug such as `core`, `sqlite-storage`, `manual-capture`, `sqlite-fts-search`, or `query-ai`. |
+| `kind` | Category: `core`, `query`, `provider`, `connector`, `search`, or `storage`. |
+| `dependencies` | Other capability names that must be present and enabled before this capability can be enabled. |
+| `default_enabled` | Built-in policy when no operator override exists. Base capabilities default to `true`; AI/provider/connector-style capabilities default to `false`. |
+| `configuration` | `ConfigRequirement` records describing config keys or credential handles. Missing required values are checked only when the capability is effectively enabled. |
+| `description` | One-sentence display text. |
+| `version` | Optional module or contract version. |
+| `owner` | `builtin` for base package metadata or the installed module/package identifier. |
+
+Registry records expose origin separately from readiness. `built-in` means metadata ships with the
+base package, `installed` means metadata came from an explicitly supplied module, and
+`unavailable` means a referenced capability has no metadata. Status values are `enabled`,
+`disabled`, and `misconfigured`: enabled means present, effectively enabled, dependencies are
+enabled, and required configuration is present; disabled means present but inactive; misconfigured
+means enabled policy found missing/disabled/unavailable/misconfigured dependencies, a dependency
+cycle, or missing required configuration. `effective_enabled` is computed as operator override if
+present, otherwise `default_enabled`.
+
+The API is side-effect-light and does not initialize adapters or make network calls:
+
+- `list_capabilities()` returns all known records with origin, effective state, status, and diagnostics.
+- `get_capability(name)` returns one record or `None`.
+- `is_enabled(name)` is `true` only for present, enabled, valid capabilities.
+- `validate()` returns a full report with flattened diagnostics available on the report.
+
+Example installed capability declaration:
+
+```python
+from idea_inbox.capabilities.registry import CapabilityRegistry
+from idea_inbox.core.capabilities import Capability, CapabilityKind, ConfigRequirement
+
+provider = Capability(
+    name="openai-compatible-provider",
+    kind=CapabilityKind.PROVIDER,
+    dependencies=("core",),
+    default_enabled=False,
+    configuration=(
+        ConfigRequirement(
+            key="IDEA_INBOX_OPENAI_API_KEY",
+            required_when_enabled=True,
+            secret=True,
+            description="OpenAI-compatible credential handle.",
+        ),
+    ),
+    description="Planned OpenAI-compatible model provider.",
+    owner="example-provider-package",
+)
+
+registry = CapabilityRegistry(installed_capabilities=(provider,))
+record = registry.get_capability("openai-compatible-provider")
+```
+
 ## CLI usage
 
 ### Smoke command
