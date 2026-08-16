@@ -1,6 +1,6 @@
 # Provider Guide
 
-Providers supply model, embedding, and credential capabilities without leaking provider-specific SDKs or auth flows into the core domain.
+Providers supply optional model, embedding, and credential capabilities without leaking provider-specific SDKs or auth flows into the core domain. The base app must run without provider modules enabled.
 
 ## Model providers
 
@@ -19,7 +19,7 @@ The core must not assume OpenAI API keys. Supported paths should include:
 - local sentence-transformer embedding provider
 - OAuth/proxy/Codex-style credential flows later
 
-Model and embedding providers own generation/embedding API calls and provider-specific request mapping only. They request secrets or session material through `CredentialProvider`; they do not store secrets, refresh OAuth tokens, run browser login flows, or decide how credentials are persisted.
+Model and embedding providers own generation/embedding API calls and provider-specific request mapping only. They are installed/enabled deliberately by the operator and must not be invoked by base startup, migration, capture, or FTS search. They request secrets or session material through `CredentialProvider`; they do not store secrets, refresh OAuth tokens, run browser login flows, or decide how credentials are persisted.
 
 ## Credential providers
 

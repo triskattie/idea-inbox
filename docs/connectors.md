@@ -1,6 +1,6 @@
 # Connector Guide
 
-Connectors ingest messages from external systems.
+Connectors are optional modules that ingest messages from external systems. The manual API is the only built-in capture path required by the base app.
 
 ## Contract
 

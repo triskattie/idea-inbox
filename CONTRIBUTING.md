@@ -1,6 +1,6 @@
 # Contributing
 
-Idea Inbox is designed for small, safe contributions. New platforms and AI providers should be addable as modules, not rewrites.
+Idea Inbox is designed for small, safe contributions. The base app should stay lightweight; AI, embeddings, connectors, hosted providers, and heavier deployment profiles should be addable as opt-in modules, not rewrites or default requirements.
 
 ## Development workflow
 
@@ -64,6 +64,7 @@ Stable extension boundaries:
 Rules:
 
 - New platforms/providers are modules, not rewrites.
+- AI, embeddings, connector runtimes, hosted providers, and vector databases are opt-in capabilities, not base-app prerequisites.
 - Core domain code must not import provider SDK types.
 - Route handlers stay thin; domain logic lives in services/core modules.
 - Dependency injection over global clients.

@@ -40,11 +40,14 @@ def test_contributing_documents_uv_prerequisite_and_venv_fallback() -> None:
     assert ".venv/bin/python -m ruff check ." in contributing
 
 
-def test_initial_product_spec_keeps_query_before_optional_hybrid_search() -> None:
+def test_initial_product_spec_plans_module_contract_before_optional_ai_query() -> None:
     initial_spec = read_doc("docs/specs/initial-product-spec.md")
 
-    assert initial_spec.index("5. Cited query endpoint.") < initial_spec.index(
-        "6. Embeddings and hybrid search."
+    assert initial_spec.index(
+        "5. Capability/module contract and registry plan."
+    ) < initial_spec.index("6. Optional cited query capability/module.")
+    assert initial_spec.index("6. Optional cited query capability/module.") < initial_spec.index(
+        "7. Optional embeddings and hybrid search module."
     )
 
 
@@ -203,3 +206,26 @@ def test_project_documents_human_supervised_hermes_development() -> None:
     assert "planning" in doc
     assert "skills" in doc
     assert "tool-based verification" in doc
+
+
+def test_docs_define_optional_module_direction_before_ai_query() -> None:
+    readme = read_doc("README.md")
+    architecture = read_doc("docs/architecture.md")
+    mvp_spec = read_doc("docs/specs/mvp-architecture-spec.md")
+    adr = read_doc("docs/decisions/ADR-007-optional-capability-modules.md")
+    contributing = read_doc("CONTRIBUTING.md")
+
+    assert "## Optional module roadmap" in readme
+    assert (
+        "Put cited natural-language query behind an explicit `query-ai` capability/module" in readme
+    )
+    assert "AI-assisted query is an optional capability module" in architecture
+    assert "## Explicit module plan" in mvp_spec
+    assert "### Phase 5: Capability/module contract and registry" in mvp_spec
+    assert "### Phase 6: Optional cited query capability" in mvp_spec
+    assert mvp_spec.index("### Phase 5: Capability/module contract and registry") < mvp_spec.index(
+        "### Phase 6: Optional cited query capability"
+    )
+    assert "ADR-007-optional-capability-modules.md" in mvp_spec
+    assert "AI is not a prerequisite for installation, startup, tests, or basic self-hosting" in adr
+    assert "opt-in capabilities, not base-app prerequisites" in contributing

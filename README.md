@@ -1,12 +1,13 @@
 # Idea Inbox
 
-Self-hosted idea capture and retrieval assistant for collecting ideas from chat, email, webhooks, and other inboxes, then querying them later with cited answers.
+Self-hosted idea capture and retrieval assistant for collecting ideas from chat, email, webhooks, and other inboxes, then searching them locally and optionally querying them later with cited AI-assisted answers.
 
 ## Goals
 
 - Easy self-hosting with a lightweight default path.
 - Contributor-friendly architecture and documentation.
 - Stable extension points for connectors, model providers, embedding providers, credential providers, storage, and search.
+- Optional capability modules for AI query, embeddings, platform connectors, and heavier deployment profiles; the base app must not automatically opt users into AI or nonessential integrations.
 - No lock-in to OpenAI API keys: local AI, OpenAI-compatible endpoints, OAuth/proxy/Codex-style flows should be addable without rewrites.
 
 ## Human-supervised Hermes Agent development
@@ -25,9 +26,12 @@ The first release is a local manual capture and search MVP:
 4. Runnable local `dev`/`serve` API startup.
 5. Documentation for the current setup, usage, and limitations.
 
-Cited natural-language query answers, provider interfaces, Telegram/email/Discord connectors, and
-optional Postgres + pgvector deployment profiles are planned for later milestones because they
-require model/provider and connector work beyond the first local capture/search slice.
+Cited natural-language query answers are still a product goal, but they are planned as an
+optional AI/query capability rather than a requirement for the base app. Provider interfaces,
+Telegram/email/Discord connectors, embeddings, and optional Postgres + pgvector deployment
+profiles are later opt-in modules because they require model/provider, connector, or heavier
+deployment work beyond the first local capture/search slice. See
+[ADR-007](docs/decisions/ADR-007-optional-capability-modules.md).
 
 ## Development status
 
@@ -166,6 +170,21 @@ and must be between `1` and `50`.
 Results are ordered by SQLite `bm25(idea_fts)` score, then newest `captured_at`, then stable
 idea id. Snippets highlight matches from idea text with `<mark>...</mark>`. The endpoint does
 not expose raw idea text or raw payload bodies in the response.
+
+## Optional module roadmap
+
+The default install should continue to support manual capture and SQLite keyword search without
+AI, hosted model credentials, connector tokens, vector databases, or hidden outbound calls. The
+explicit module plan is:
+
+1. Define a lightweight capability/module contract and registry before adding features that would
+   otherwise make AI or heavyweight integrations feel mandatory.
+2. Put cited natural-language query behind an explicit `query-ai` capability/module. Tests may use
+   deterministic local/mock providers, but real model calls must require deliberate configuration.
+3. Add embeddings/hybrid search, platform connectors, hosted/local model providers, and
+   Postgres/pgvector deployment profiles as separately installable or enableable modules.
+4. Keep core startup, migration, capture, and FTS search healthy when no optional modules are
+   installed.
 
 ## CLI usage
 

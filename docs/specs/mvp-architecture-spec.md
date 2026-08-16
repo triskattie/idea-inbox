@@ -22,12 +22,13 @@ This spec consolidates the repository discovery in
 - [`../decisions/ADR-004-credential-providers.md`](../decisions/ADR-004-credential-providers.md)
 - [`../decisions/ADR-005-raw-events-derived-ideas.md`](../decisions/ADR-005-raw-events-derived-ideas.md)
 - [`../decisions/ADR-006-mvp-scope-and-local-first-self-hosting.md`](../decisions/ADR-006-mvp-scope-and-local-first-self-hosting.md)
+- [`../decisions/ADR-007-optional-capability-modules.md`](../decisions/ADR-007-optional-capability-modules.md)
 
 ## Product goal
 
-Idea Inbox is a lightweight, self-hosted assistant for capturing ideas from inbox-like sources and querying them later with answers that cite stored ideas. The MVP optimizes for a single self-hosting operator and contributor-friendly extension points before broad platform coverage.
+Idea Inbox is a lightweight, self-hosted assistant for capturing ideas from inbox-like sources, searching them locally, and optionally querying them later with answers that cite stored ideas. The MVP optimizes for a single self-hosting operator and contributor-friendly extension points before broad platform coverage.
 
-Success means a user can run the app locally, capture ideas through a manual API, preserve the original input as raw events, derive searchable ideas, search them through SQLite, and ask a query endpoint for retrieval-grounded answers with citations. Additional connectors and providers must fit behind stable interfaces rather than requiring core rewrites.
+Success means a user can run the base app locally, capture ideas through a manual API, preserve the original input as raw events, derive searchable ideas, and search them through SQLite without AI, hosted-model credentials, connector tokens, vector databases, or hidden outbound calls. Cited natural-language query remains a product goal, but it belongs behind an explicit optional capability/module so additional connectors and providers fit behind stable interfaces rather than requiring core rewrites.
 
 ## Non-goals
 
@@ -37,7 +38,7 @@ The MVP does not include:
 - Multi-user accounts, organizations, role-based access control, or sharing permissions.
 - Unofficial account-scraping connectors, including unofficial WhatsApp scraping.
 - Complex autonomous workflows or agent orchestration.
-- A requirement for paid hosted models or OpenAI API keys.
+- A requirement for AI, paid hosted models, OpenAI API keys, connector credentials, embeddings, or vector databases in the base app.
 - Production-only infrastructure as the default path.
 
 ## User-facing MVP scope
@@ -48,17 +49,19 @@ The MVP does not include:
 2. Manual idea capture endpoint for direct text input.
 3. Raw event ingestion and idempotent normalization into ideas.
 4. SQLite default storage with migrations and FTS-backed keyword search.
-5. Provider interfaces for answer generation and embeddings, with deterministic mocks for tests.
-6. Query endpoint that returns cited answers or an explicit no-evidence response.
-7. Connector interfaces and first connector modules for manual API, generic webhook, Telegram, email/IMAP, and Discord.
-8. Optional Postgres + pgvector deployment profile after the SQLite path is healthy.
-9. Self-hosting docs and configuration examples that match implemented commands.
+5. Provider/capability interfaces for optional answer generation and embeddings, with deterministic mocks for tests.
+6. An explicit capability/module contract and registry plan before AI query or heavyweight integrations become user-facing.
+7. Optional query capability/module that returns cited answers or an explicit no-evidence response when enabled.
+8. Connector interfaces and optional connector modules for generic webhook, Telegram, email/IMAP, and Discord.
+9. Optional Postgres + pgvector deployment profile after the SQLite path is healthy.
+10. Self-hosting docs and configuration examples that match implemented commands.
 
 ### Out of scope until after MVP
 
 - Browser/mobile UI beyond API-friendly responses.
 - Multi-user ownership semantics beyond future-proof field naming where low-cost.
 - Streaming answers, long-running background enrichment, and advanced ranking.
+- A fully installable third-party plugin marketplace; near-term work only needs a small internal capability/module contract.
 - OAuth/device login implementations; only the contract must allow them later.
 - WhatsApp Cloud API support unless the official API path is separately specified.
 
@@ -106,7 +109,7 @@ If `uv` is unavailable, workers may use an isolated virtual environment for `pyt
 The core data flow is:
 
 ```text
-External source → Connector → RawEvent → IdeaDraft → Idea → Indexes → Query → Cited answer
+External source → Connector → RawEvent → IdeaDraft → Idea → Indexes → Search → Optional query module → Cited answer
 ```
 
 Recommended module boundaries:
@@ -123,7 +126,7 @@ src/idea_inbox/
   cli.py            command entry point, including dev/server commands
 ```
 
-Core code may depend on protocols and plain domain data types only. Adapter modules depend inward on core contracts. API routes, connector handlers, provider implementations, and storage backends should be replaceable without changing the core ingestion/query services.
+Core code may depend on protocols and plain domain data types only. Adapter modules depend inward on core contracts. API routes, connector handlers, provider implementations, optional capability modules, and storage backends should be replaceable without changing the core ingestion/search services.
 
 ### Current implementation baseline
 
@@ -310,6 +313,7 @@ ingest(source, payload, headers) -> IngestResult(raw_event, ideas, duplicate)
 
 `QueryService`
 
+- Belongs to the optional query capability/module rather than mandatory core startup.
 - Searches stored ideas, calls the model provider only with retrieved evidence, and returns citations.
 - If no relevant evidence exists, returns a no-evidence response without hallucinated content.
 
@@ -430,7 +434,11 @@ Implemented behavior as of the FTS search slice:
 - Results are ordered by `bm25(idea_fts)`, then newest capture timestamp, then stable idea id.
   `next_cursor` is currently always `null`.
 
-### Query with cited answer
+### Optional query with cited answer
+
+`POST /v1/query` is planned for the optional query capability/module, not the base capture/search
+app. When that module is not installed or enabled, base startup, migration, manual capture, and
+FTS search must continue to work without AI or model-provider configuration.
 
 ```text
 POST /v1/query
@@ -473,6 +481,50 @@ Response without evidence:
 ```
 
 The query endpoint must never present generated claims as grounded unless at least one stored idea citation is returned.
+
+## Explicit module plan
+
+The module system can land in stages because the project has no external users yet, but the
+architecture must keep optional features from becoming implicit core requirements.
+
+### Phase 5: Capability/module contract and registry
+
+Goal: make module-ability explicit before adding AI query or heavier integrations.
+
+Acceptance criteria:
+
+- Define a small `Capability`/module metadata shape with name, kind, dependencies,
+  default-enabled state, and configuration requirements.
+- Add a registry that can report which capabilities are built in, installed, enabled, disabled,
+  or unavailable.
+- Keep manual capture, SQLite migrations, API startup, and FTS search working when no optional
+  capabilities are enabled.
+- Keep provider/connector environment variables inert unless their owning capability is enabled.
+- Document how future installable modules can map onto this internal registry without committing
+  to a plugin packaging format too early.
+
+### Phase 6: Optional cited query capability
+
+Goal: add cited natural-language answers without making AI part of the base app.
+
+Acceptance criteria:
+
+- `POST /v1/query` is available only when the query capability is enabled, or returns an explicit
+  capability-disabled error otherwise.
+- Tests use deterministic local/mock providers; real hosted or local model calls require
+  deliberate operator configuration.
+- Query answers retrieve stored ideas first, send only retrieved evidence to the model/provider,
+  and cite persisted `Idea` records.
+- The default install path still needs no hosted model credentials, connector tokens, embeddings,
+  vector database, or outbound model calls.
+
+### Later optional modules
+
+- Embeddings and hybrid/vector search.
+- Hosted and local model providers.
+- Telegram, email/IMAP, Discord, generic webhook, and other connector modules.
+- Postgres + pgvector deployment/storage profile.
+- OAuth/device, proxy, Codex-style, or browser-login credential providers.
 
 ## Storage design
 
@@ -739,17 +791,32 @@ Acceptance criteria:
 - `GET /v1/ideas/search` returns paginated, ranked hits with snippets.
 - Tests cover no-results, ranking stability, and limit behavior.
 
-### Phase 5: Cited query endpoint
+### Phase 5: Capability/module contract and registry
 
 Acceptance criteria:
 
-- `POST /v1/query` retrieves ideas before answer generation.
+- Capability/module metadata exists for core, query, provider, connector, search, and storage
+  capabilities.
+- The registry can report built-in, installed, enabled, disabled, and unavailable capabilities.
+- Startup, migration, manual capture, and FTS search still work with no optional capabilities
+  enabled.
+- Reserved provider/connector settings stay inert until their owning capability is enabled.
+
+### Phase 6: Optional cited query capability
+
+Acceptance criteria:
+
+- `POST /v1/query` is available only when the query capability is enabled, or returns an explicit
+  capability-disabled error.
+- Query retrieves ideas before answer generation.
 - The model provider receives only the query and retrieved evidence.
 - Responses include citations pointing to stored idea IDs.
 - No-evidence queries return an explicit no-evidence response.
 - Tests use deterministic mock providers and verify citation behavior.
+- Real model calls require deliberate operator configuration and are not part of the default
+  capture/search path.
 
-### Phase 6: Provider adapters
+### Phase 7: Optional provider adapters
 
 Acceptance criteria:
 
@@ -757,8 +824,9 @@ Acceptance criteria:
 - Mock providers are used by default in tests.
 - OpenAI-compatible and local/Ollama providers are isolated from core services.
 - Secrets flow through credential providers, not direct environment reads in model providers.
+- Provider adapters are opt-in capabilities and do not affect base startup or search when disabled.
 
-### Phase 7: Connector modules
+### Phase 8: Optional connector modules
 
 Acceptance criteria:
 
@@ -767,7 +835,7 @@ Acceptance criteria:
 - Normal tests never call real platforms.
 - Provider IDs are preserved for idempotency.
 
-### Phase 8: Optional Postgres + pgvector profile
+### Phase 9: Optional Postgres + pgvector profile
 
 Acceptance criteria:
 
@@ -796,17 +864,19 @@ The first release is accepted when all of the following are true:
 These original roadmap phases remain intentionally deferred until after the first local
 capture/search release:
 
-1. Cited query answers that cite stored ideas and refuse to invent evidence when no relevant ideas
-   are found.
-2. Model, embedding, and credential provider adapters.
-3. Connector modules for generic webhook, Telegram, email/IMAP, and Discord fixture ingestion.
-4. Optional Postgres + pgvector deployment profile.
+1. Capability/module contract and registry before adding AI or heavier integrations.
+2. Optional cited query answers that cite stored ideas and refuse to invent evidence when no
+   relevant ideas are found.
+3. Optional model, embedding, and credential provider adapters.
+4. Optional connector modules for generic webhook, Telegram, email/IMAP, and Discord fixture
+   ingestion.
+5. Optional Postgres + pgvector deployment profile.
 
 ## Implementation review notes and risks
 
-This spec has been checked against the current repository skeleton, `CONTRIBUTING.md`, `pyproject.toml`, the README, supporting docs, and ADR-001 through ADR-006. The main boundaries are implementable in small TDD slices, with these constraints for downstream tasks:
+This spec has been checked against the current repository skeleton, `CONTRIBUTING.md`, `pyproject.toml`, the README, supporting docs, and ADR-001 through ADR-007. The main boundaries are implementable in small TDD slices, with these constraints for downstream tasks:
 
-1. Phase 1 through Phase 4 have landed for the v0.1.0 local capture/search release: the module layout, `idea-inbox dev`, `idea-inbox migrate`, `idea-inbox serve`, manual capture, SQLite storage, and FTS search exist and are covered by tests. Later tasks should build cited query, providers, and connectors on top of those established interfaces.
+1. Phase 1 through Phase 4 have landed for the v0.1.0 local capture/search release: the module layout, `idea-inbox dev`, `idea-inbox migrate`, `idea-inbox serve`, manual capture, SQLite storage, and FTS search exist and are covered by tests. Later tasks should add the capability/module registry first, then build optional cited query, providers, and connectors on top of those established interfaces.
 2. Verification must match configured tooling. `pytest`, `ruff check`, and `ruff format --check` are current gates; `mypy` remains planned until configured.
 3. API pagination needs a concrete shared schema before the first list/search route lands. Use a cursor or limit/offset shape consistently, test invalid limits, and keep all list endpoints paginated from day one.
 4. Persistence and indexing need an explicit consistency rule. `IngestionService` should save raw events and ideas transactionally, then update `SearchIndex` in a way that can be retried or rebuilt without losing the authoritative storage record.

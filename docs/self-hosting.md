@@ -18,9 +18,9 @@ uv run idea-inbox dev --host 127.0.0.1 --port 8080
 ```
 
 Local/mock mode is the privacy-preserving default for development: it must not require
-hosted-model credentials, hidden outbound model calls, or telemetry. Hosted model providers may
-be configured explicitly later, but they are optional accelerators rather than a requirement for
-local development.
+hosted-model credentials, hidden outbound model calls, connector tokens, vector databases, or
+telemetry. Hosted/local model providers and AI-assisted query may be configured explicitly later,
+but they are optional modules rather than requirements for local development.
 
 The WSGI API app is available as `idea_inbox.api.create_app`, and the CLI server wrapper starts
 it after applying pending SQLite migrations. It currently exposes:
@@ -125,9 +125,11 @@ removes the raw-event trail, drafts, ideas, tags, and search projection together
 
 ## Planned lightweight self-hosting
 
-The intended lightweight self-host path is the current SQLite-backed WSGI API plus mock or local
-providers packaged for a single host. A Docker image may become the convenient packaging format
-once the repository includes a Dockerfile and a published image exists.
+The intended lightweight self-host path is the current SQLite-backed WSGI API packaged for a
+single host. Optional modules can add AI-assisted query, model providers, connectors, embeddings,
+or richer deployment profiles, but the base self-host path should remain capture + SQLite search
+without mandatory AI. A Docker image may become the convenient packaging format once the
+repository includes a Dockerfile and a published image exists.
 
 ## Planned production self-hosting
 
