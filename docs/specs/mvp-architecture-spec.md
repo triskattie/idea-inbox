@@ -377,10 +377,10 @@ Implemented validation behavior:
 - Validation failures return `400 VALIDATION_ERROR` with the failing field in
   `error.details.field`; storage failures return `500 STORAGE_ERROR` without exposing internals.
 
-Known MVP limitations: manual capture does not yet accept or enforce an idempotency-key header,
-so replayed requests create new raw events and ideas; the endpoint also has no application-level
-access-token gate yet and should be bound to localhost or protected by external network controls
-when self-hosted.
+Known MVP limitations: manual capture has no application-level access-token gate yet and should be
+bound to localhost or protected by external network controls when self-hosted. The endpoint accepts
+an optional body-level `idempotency_key`; repeated manual captures with the same source-scoped key
+return the existing raw event/draft/idea lineage instead of creating duplicates.
 
 ### Generic connector ingestion
 
@@ -776,26 +776,37 @@ Acceptance criteria:
 - SQLite remains the default dev path.
 - Tests clearly separate always-run unit/SQLite tests from opt-in Postgres integration tests.
 
-## MVP acceptance criteria
+## Release milestones
 
-The MVP is accepted when all of the following are true:
+### v0.1.0 local capture/search MVP
+
+The first release is accepted when all of the following are true:
 
 1. A fresh contributor can install dependencies, run tests, and start the local app from documented commands.
 2. Manual idea capture creates a raw event, derives an idea, stores both, indexes the idea, and returns stable identifiers.
-3. Duplicate manual or connector events are idempotent by source and dedupe key.
+3. Duplicate manual events are idempotent by source and dedupe key.
 4. Keyword search returns stored ideas with deterministic ranking and snippets.
-5. Query answers cite stored ideas and refuse to invent evidence when no relevant ideas are found.
-6. Connector/provider/storage/search/core boundaries are enforced by imports, tests, and interfaces.
-7. Normal tests use mocks/fixtures and make no real platform or model calls.
-8. SQLite is healthy as the default local backend.
-9. Optional hosted AI paths are configurable but not required.
-10. Docs link the implemented command/configuration surface and note which connectors/providers are available versus planned.
+5. Core/storage/search boundaries are enforced by imports, tests, and interfaces.
+6. Normal tests use mocks/fixtures and make no real platform or model calls.
+7. SQLite is healthy as the default local backend.
+8. Docs link the implemented command/configuration surface and note which connectors/providers are available versus planned.
+
+### Post-v0.1 roadmap
+
+These original roadmap phases remain intentionally deferred until after the first local
+capture/search release:
+
+1. Cited query answers that cite stored ideas and refuse to invent evidence when no relevant ideas
+   are found.
+2. Model, embedding, and credential provider adapters.
+3. Connector modules for generic webhook, Telegram, email/IMAP, and Discord fixture ingestion.
+4. Optional Postgres + pgvector deployment profile.
 
 ## Implementation review notes and risks
 
 This spec has been checked against the current repository skeleton, `CONTRIBUTING.md`, `pyproject.toml`, the README, supporting docs, and ADR-001 through ADR-006. The main boundaries are implementable in small TDD slices, with these constraints for downstream tasks:
 
-1. Phase 1 is a prerequisite for later implementation. The target module layout, `idea-inbox dev`, `idea-inbox migrate`, and `idea-inbox serve` do not exist yet, so later tasks should not assume route, storage, connector, or provider packages are present before creating them with tests.
+1. Phase 1 through Phase 4 have landed for the v0.1.0 local capture/search release: the module layout, `idea-inbox dev`, `idea-inbox migrate`, `idea-inbox serve`, manual capture, SQLite storage, and FTS search exist and are covered by tests. Later tasks should build cited query, providers, and connectors on top of those established interfaces.
 2. Verification must match configured tooling. `pytest`, `ruff check`, and `ruff format --check` are current gates; `mypy` remains planned until configured.
 3. API pagination needs a concrete shared schema before the first list/search route lands. Use a cursor or limit/offset shape consistently, test invalid limits, and keep all list endpoints paginated from day one.
 4. Persistence and indexing need an explicit consistency rule. `IngestionService` should save raw events and ideas transactionally, then update `SearchIndex` in a way that can be retried or rebuilt without losing the authoritative storage record.

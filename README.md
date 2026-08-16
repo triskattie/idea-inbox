@@ -15,15 +15,19 @@ Idea Inbox is a human-directed, AI-assisted project: it has been mainly coded us
 
 See [Development with Hermes Agent](docs/development-with-hermes.md) for the collaboration model and the Hermes features used so far.
 
-## Planned MVP
+## v0.1.0 release scope
+
+The first release is a local manual capture and search MVP:
 
 1. Manual API idea capture.
 2. Raw event ingestion pipeline.
 3. SQLite default storage and full-text search.
-4. Provider interfaces for embeddings and answer generation.
-5. Cited query endpoint.
-6. Telegram, email, and Discord connectors.
-7. Optional Postgres + pgvector production profile.
+4. Runnable local `dev`/`serve` API startup.
+5. Documentation for the current setup, usage, and limitations.
+
+Cited natural-language query answers, provider interfaces, Telegram/email/Discord connectors, and
+optional Postgres + pgvector deployment profiles are planned for later milestones because they
+require model/provider and connector work beyond the first local capture/search slice.
 
 ## Development status
 
