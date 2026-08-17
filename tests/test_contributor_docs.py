@@ -246,6 +246,33 @@ def test_docs_define_optional_module_direction_before_ai_query() -> None:
     assert "No AI query endpoint, model calls, embeddings" in capability_spec
 
 
+def test_docs_define_v020_cited_query_api_contract() -> None:
+    readme = read_doc("README.md")
+    contributing = read_doc("CONTRIBUTING.md")
+    mvp_spec = read_doc("docs/specs/mvp-architecture-spec.md")
+    adr = read_doc("docs/decisions/ADR-003-cited-retrieval-answers.md")
+    query_spec = read_doc("docs/specs/cited-query-api-contract.md")
+    squashed_spec = squash_whitespace(query_spec)
+
+    assert "cited-query-api-contract.md" in readme
+    assert "cited-query-api-contract.md" in contributing
+    assert "cited-query-api-contract.md" in mvp_spec
+    assert "cited-query-api-contract.md" in adr
+
+    assert "# Spec: v0.2.0 cited query API contract" in query_spec
+    assert "POST /v1/query" in query_spec
+    assert "CAPABILITY_DISABLED" in query_spec
+    assert "Cited query is not enabled for this Idea Inbox instance." in query_spec
+    assert "no_relevant_stored_ideas" in query_spec
+    assert "I could not find relevant stored ideas for that query." in query_spec
+    assert '`answer.grounding == "stored_ideas"` requires `citations` to be non-empty' in query_spec
+    assert "RawEvent -> IdeaDraft -> Idea -> SearchHit -> Citation" in query_spec
+    assert "must resolve each hit through authoritative storage by `idea_id`" in query_spec
+    assert "must not return raw event payload bodies by default" in squashed_spec
+    assert "Real hosted or local model-provider adapters" in query_spec
+    assert "deterministic local/mock" in query_spec
+
+
 def test_docs_describe_implemented_capability_registry_contract() -> None:
     readme = read_doc("README.md")
     contributing = read_doc("CONTRIBUTING.md")

@@ -16,6 +16,7 @@ This spec consolidates the repository discovery in
 - [`../self-hosting.md`](../self-hosting.md)
 - [`sqlite-schema-plan.md`](sqlite-schema-plan.md)
 - [`capability-registry-spec.md`](capability-registry-spec.md)
+- [`cited-query-api-contract.md`](cited-query-api-contract.md)
 - [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md)
 - [`../decisions/ADR-001-connector-and-provider-boundaries.md`](../decisions/ADR-001-connector-and-provider-boundaries.md)
 - [`../decisions/ADR-002-sqlite-default-postgres-production.md`](../decisions/ADR-002-sqlite-default-postgres-production.md)
@@ -437,51 +438,33 @@ Implemented behavior as of the FTS search slice:
 
 ### Optional query with cited answer
 
-`POST /v1/query` is planned for the optional query capability/module, not the base capture/search
-app. When that module is not installed or enabled, base startup, migration, manual capture, and
-FTS search must continue to work without AI or model-provider configuration.
+`POST /v1/query` is planned for the optional `query-ai` capability/module, not the base
+capture/search app. When that capability is disabled, unavailable, or misconfigured, base startup,
+migration, manual capture, and FTS search must continue to work without AI or model-provider
+configuration, and the route returns an explicit `CAPABILITY_DISABLED` error instead of attempting
+retrieval or provider calls.
 
-```text
-POST /v1/query
-```
+The detailed v0.2.0 foundation contract is maintained in
+[`cited-query-api-contract.md`](cited-query-api-contract.md). In summary:
 
-Request:
+- Request body is a JSON object with required trimmed non-empty `query`, optional `limit` from `1`
+  through `50`, optional deterministic `filters` currently limited to `source`, and optional
+  `include_hits`.
+- Evidence-backed responses return `200 OK` with `answer.message`,
+  `answer.grounding == "stored_ideas"`, non-empty `citations`, retrieval `hits`, and safe `meta`.
+- No-evidence responses return `200 OK` with the explicit message
+  `I could not find relevant stored ideas for that query.`,
+  `answer.grounding == "no_relevant_stored_ideas"`, `citations: []`, and `hits: []`.
+- Capability-disabled responses return the standard error envelope with
+  `error.code == "CAPABILITY_DISABLED"` and safe capability diagnostics.
+- Every grounded claim about stored ideas must be backed by at least one citation. The endpoint must
+  never fabricate stored-idea claims, idea IDs, snippets, source metadata, or provenance IDs.
 
-```json
-{
-  "query": "What ideas did I save about local AI?",
-  "limit": 10
-}
-```
-
-Response with evidence:
-
-```json
-{
-  "answer": "You saved two ideas about local AI...",
-  "citations": [
-    {
-      "idea_id": "idea_...",
-      "quote": "local AI should work without hosted APIs",
-      "source": "manual",
-      "captured_at": "2026-08-09T00:00:00Z"
-    }
-  ],
-  "hits": []
-}
-```
-
-Response without evidence:
-
-```json
-{
-  "answer": "I could not find stored ideas relevant to that query.",
-  "citations": [],
-  "hits": []
-}
-```
-
-The query endpoint must never present generated claims as grounded unless at least one stored idea citation is returned.
+Citations point to persisted `Idea` records, not standalone index rows or model-generated
+references. Query execution may retrieve `SearchHit` rows first, but it must resolve hits through
+storage before answer construction and citation creation. Citation lineage should preserve safe
+`RawEvent -> IdeaDraft -> Idea` identifiers where the storage record has them, while raw event
+payload bodies are not returned by default.
 
 ## Explicit module plan
 

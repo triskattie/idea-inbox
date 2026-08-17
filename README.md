@@ -179,8 +179,13 @@ explicit module plan is:
 
 1. Define a lightweight capability/module contract and registry before adding features that would
    otherwise make AI or heavyweight integrations feel mandatory.
-2. Put cited natural-language query behind an explicit `query-ai` capability/module. Tests may use
-   deterministic local/mock providers, but real model calls must require deliberate configuration.
+2. Put cited natural-language query behind an explicit `query-ai` capability/module. The
+   v0.2.0 foundation contract for `POST /v1/query` is documented in
+   [cited-query-api-contract.md](docs/specs/cited-query-api-contract.md): grounded answers must
+   cite persisted ideas, no-evidence responses must return empty citations with an explicit
+   `no_relevant_stored_ideas` grounding value, and disabled query capability returns
+   `CAPABILITY_DISABLED` without provider calls. Tests may use deterministic local/mock providers,
+   but real model calls must require deliberate configuration.
 3. Add embeddings/hybrid search, platform connectors, hosted/local model providers, and
    Postgres/pgvector deployment profiles as separately installable or enableable modules.
 4. Keep core startup, migration, capture, and FTS search healthy when no optional modules are

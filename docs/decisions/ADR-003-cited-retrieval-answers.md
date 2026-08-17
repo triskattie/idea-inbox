@@ -5,9 +5,9 @@ Accepted
 
 ## Context
 
-The assistant must answer from the user's captured ideas, not invent project memory. The MVP architecture spec requires `/v1/query` to retrieve stored ideas before answer generation, cite persisted ideas when evidence exists, and return an explicit no-evidence response when retrieval finds no relevant ideas.
+The assistant must answer from the user's captured ideas, not invent project memory. The MVP architecture spec requires `/v1/query` to retrieve stored ideas before answer generation, cite persisted ideas when evidence exists, and return an explicit no-evidence response when retrieval finds no relevant ideas. The v0.2.0 cited-query API contract turns that decision into a testable request/response and citation contract.
 
-See [`../specs/mvp-architecture-spec.md`](../specs/mvp-architecture-spec.md), especially the query API, search design, `QueryService` contract, and MVP acceptance criteria.
+See [`../specs/mvp-architecture-spec.md`](../specs/mvp-architecture-spec.md) and [`../specs/cited-query-api-contract.md`](../specs/cited-query-api-contract.md), especially the query API, citation contract, capability-disabled response, and provenance requirements.
 
 ## Decision
 

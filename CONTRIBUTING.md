@@ -109,6 +109,21 @@ and add tests proving insert, update, delete, rebuild, and raw-payload non-index
 Do not index `raw_events.payload` directly. Raw events are the authoritative audit trail;
 search and cited answers must resolve through stored `ideas` and stable idea IDs.
 
+### Cited query contract maintenance
+
+The v0.2.0 cited-query foundation is specified in
+`docs/specs/cited-query-api-contract.md`. Keep `POST /v1/query` behind the `query-ai` capability;
+when disabled, unavailable, or misconfigured it returns `CAPABILITY_DISABLED` and must not retrieve,
+call providers, or make hidden network calls. Evidence-backed answers use
+`answer.grounding == "stored_ideas"` and require non-empty citations pointing to persisted `Idea`
+records. No-evidence responses use `answer.grounding == "no_relevant_stored_ideas"`, the explicit
+no-relevant-stored-ideas message, and empty `citations`/`hits`.
+
+Query implementation must resolve search hits through storage before citation creation. Citations
+may expose safe `RawEvent -> IdeaDraft -> Idea` IDs where present, but must not return raw event
+payload bodies by default. Tests must fail if a grounded stored-idea claim, idea ID, snippet,
+source metadata, or provenance ID is fabricated or not backed by resolved stored evidence.
+
 ### SQLite local development database
 
 The default local database is `sqlite:///./data/idea-inbox.sqlite3`, configured through
