@@ -3,6 +3,8 @@ from io import BytesIO
 from pathlib import Path
 from wsgiref.util import setup_testing_defaults
 
+import pytest
+
 from idea_inbox.api import create_app
 from idea_inbox.capabilities.registry import CapabilityRegistry
 from idea_inbox.core.capabilities import Capability, CapabilityKind
@@ -142,6 +144,10 @@ def request(
     return response_status, response_headers, json.loads(response_body.decode("utf-8"))
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="v0.2 RED contract: POST /v1/query capability-disabled route is not implemented yet.",
+)
 def test_query_endpoint_is_disabled_by_default_without_model_credentials(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -202,6 +208,10 @@ def test_query_disabled_does_not_break_manual_capture_migrations_or_existing_sea
         storage.close()
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="v0.2 RED contract: deterministic cited-query orchestration is not implemented yet.",
+)
 def test_enabled_deterministic_query_returns_stored_idea_answer_with_citations(
     tmp_path: Path,
 ) -> None:
@@ -255,6 +265,10 @@ def test_enabled_deterministic_query_returns_stored_idea_answer_with_citations(
     assert "raw payload must stay private" not in json.dumps(payload)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="v0.2 RED contract: cited-query no-evidence response is not implemented yet.",
+)
 def test_enabled_deterministic_query_returns_no_evidence_without_citations(
     tmp_path: Path,
 ) -> None:
