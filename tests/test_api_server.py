@@ -3,8 +3,6 @@ from threading import Thread
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
-import pytest
-
 from idea_inbox.api.server import create_api_server
 
 
@@ -32,10 +30,6 @@ def test_api_server_exposes_manual_capture_route(tmp_path) -> None:
     assert payload["item"]["source"] == "manual"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="v0.2 RED contract: served query capability-disabled route is not implemented yet.",
-)
 def test_api_server_starts_with_query_disabled_and_returns_capability_error(tmp_path) -> None:
     database_path = tmp_path / "ideas.sqlite3"
 

@@ -28,6 +28,9 @@ it after applying pending SQLite migrations. It currently exposes:
 - `POST /v1/ideas` for manual idea capture. The endpoint validates and normalizes the JSON body,
   stores a `manual` raw event first, then persists the derived draft and canonical idea.
 - `GET /v1/ideas/search?q=...&limit=10` for SQLite FTS-backed search over stored ideas.
+- `POST /v1/query` for cited answers when the optional `query-ai` capability is enabled.
+  The default release path keeps this capability disabled unless a deterministic/mock provider is
+  explicitly configured; no hosted model credentials or provider SDKs are required for smoke tests.
 
 `dev` is the local development entrypoint. `serve` exposes the same API with explicit host/port
 options for local or self-hosted use. Production packaging still needs a Dockerfile, Compose file,

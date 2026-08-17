@@ -1,10 +1,46 @@
 """SDK-free core protocols for storage and search adapters."""
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import AbstractContextManager
-from typing import Protocol
+from typing import Any, Protocol
 
 from idea_inbox.core.models import Idea, IdeaDraft, RawEvent, SearchHit
+
+
+class AnswerEvidence(Protocol):
+    """Citation-safe evidence shape accepted by answerer adapters."""
+
+    idea_id: str
+    text: str
+    snippet: str
+    source: str
+    source_ref: str | None
+    captured_at: str
+    raw_event_id: str | None
+    draft_id: str | None
+    rank: int
+    score: float
+
+
+class QueryAnswer(Protocol):
+    """SDK-free answer text returned by hosted, proxy/OAuth, local, or mock answerers."""
+
+    message: str
+    grounding: str
+
+
+class Answerer(Protocol):
+    """Replaceable answer-generation boundary for cited query.
+
+    Implementations receive only resolved stored-idea evidence and return plain answer text. Adapter
+    modules may wrap hosted, OAuth/proxy, or local credentials later, but core domain code must only
+    depend on this protocol and never on provider SDK objects or API-key-specific configuration.
+    """
+
+    mode: str
+    provider_name: str | None
+
+    def answer(self, evidence: Sequence[AnswerEvidence]) -> QueryAnswer: ...
 
 
 class StorageBackend(Protocol):
@@ -57,6 +93,8 @@ class SearchIndex(Protocol):
 
     def delete_idea(self, idea_id: str) -> None: ...
 
-    def search(self, query: str, limit: int = 10) -> list[SearchHit]: ...
+    def search(
+        self, query: str, limit: int = 10, filters: dict[str, Any] | None = None
+    ) -> list[SearchHit]: ...
 
     def rebuild(self) -> None: ...

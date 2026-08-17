@@ -9,16 +9,25 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs
 
+from idea_inbox.capabilities.registry import CapabilityRegistry
 from idea_inbox.config import AppConfig, ConfigError, load_config
+from idea_inbox.core.capabilities import CapabilityStatus
 from idea_inbox.core.manual_capture import (
     ManualIdeaPayload,
     ManualIdeaValidationError,
     validate_manual_idea_payload,
 )
 from idea_inbox.core.models import EmptySearchQuery, SearchLimitError
+from idea_inbox.core.query import (
+    QueryValidationError,
+    answer_query,
+    validate_query_request,
+)
 from idea_inbox.core.services import create_manual_idea
 from idea_inbox.search.sqlite_fts import DEFAULT_LIMIT, MAX_LIMIT, SQLiteFTSSearchIndex
 from idea_inbox.storage.sqlite import SQLiteMigrationError, SQLiteStorageBackend
+
+QUERY_DISABLED_REASON = "Enable and configure the query-ai capability before using POST /v1/query."
 
 StartResponse = Callable[[str, list[tuple[str, str]]], None]
 WSGIApp = Callable[[dict[str, Any], StartResponse], Iterable[bytes]]
@@ -28,6 +37,7 @@ def create_app(
     config: AppConfig | None = None,
     *,
     database_path: str | Path | None = None,
+    capability_registry: CapabilityRegistry | None = None,
 ) -> WSGIApp:
     """Create a small WSGI app backed by the configured SQLite database."""
     if config is not None and database_path is not None:
@@ -37,6 +47,7 @@ def create_app(
         if database_path is not None
         else (config or load_config()).database_path
     )
+    resolved_capability_registry = capability_registry or CapabilityRegistry()
 
     def app(environ: dict[str, Any], start_response: StartResponse) -> Iterable[bytes]:
         method = environ.get("REQUEST_METHOD")
@@ -44,6 +55,14 @@ def create_app(
 
         if method == "POST" and path == "/v1/ideas":
             return _create_manual_idea_response(start_response, environ, resolved_database_path)
+
+        if method == "POST" and path == "/v1/query":
+            return _query_response(
+                start_response,
+                environ,
+                resolved_database_path,
+                resolved_capability_registry,
+            )
 
         if method != "GET" or path != "/v1/ideas/search":
             return _json_response(
@@ -118,6 +137,84 @@ def _search_payload(database_path: str | Path, query: str, limit: int) -> dict[s
             for hit in hits
         ],
         "page": {"limit": limit, "next_cursor": None},
+    }
+
+
+def _query_response(
+    start_response: StartResponse,
+    environ: dict[str, Any],
+    database_path: str | Path,
+    capability_registry: CapabilityRegistry,
+) -> list[bytes]:
+    capability = capability_registry.get_capability("query-ai")
+    if capability is None or capability.status != CapabilityStatus.ENABLED:
+        status = capability.status.value if capability is not None else "unavailable"
+        return _json_response(
+            start_response,
+            "503 Service Unavailable",
+            _error(
+                "CAPABILITY_DISABLED",
+                "Cited query is not enabled for this Idea Inbox instance.",
+                {
+                    "capability": "query-ai",
+                    "status": status,
+                    "reason": QUERY_DISABLED_REASON,
+                },
+            ),
+        )
+
+    try:
+        request = validate_query_request(_read_json_body(environ))
+        payload = _query_payload(database_path, request)
+    except ManualIdeaValidationError as exc:
+        return _json_response(
+            start_response,
+            "400 Bad Request",
+            _error("VALIDATION_ERROR", exc.message, {"field": exc.field}),
+        )
+    except QueryValidationError as exc:
+        return _json_response(
+            start_response,
+            "400 Bad Request",
+            _error("VALIDATION_ERROR", exc.message, {"field": exc.field}),
+        )
+    except (EmptySearchQuery, SearchLimitError, ValueError):
+        return _json_response(
+            start_response,
+            "400 Bad Request",
+            _error(
+                "VALIDATION_ERROR",
+                f"Query limit must be between 1 and {MAX_LIMIT}.",
+                {"field": "limit"},
+            ),
+        )
+    except (OSError, sqlite3.Error, SQLiteMigrationError):
+        return _json_response(
+            start_response,
+            "500 Internal Server Error",
+            _error("STORAGE_ERROR", "Query could not be answered.", {}),
+        )
+
+    return _json_response(start_response, "200 OK", payload)
+
+
+def _query_payload(database_path: str | Path, request: Any) -> dict[str, Any]:
+    storage = SQLiteStorageBackend(database_path)
+    try:
+        storage.migrate()
+        result = answer_query(
+            storage=storage,
+            search_index=SQLiteFTSSearchIndex(storage),
+            request=request,
+        )
+    finally:
+        storage.close()
+
+    return {
+        "answer": {"message": result.answer.message, "grounding": result.answer.grounding},
+        "citations": result.citations,
+        "hits": result.hits,
+        "meta": result.meta,
     }
 
 
