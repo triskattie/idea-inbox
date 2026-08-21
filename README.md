@@ -16,7 +16,9 @@ Idea Inbox is a human-directed, AI-assisted project: it has been mainly coded us
 
 See [Development with Hermes Agent](docs/development-with-hermes.md) for the collaboration model and the Hermes features used so far.
 
-## v0.1.0 release scope
+## Release scopes
+
+### v0.1.0
 
 The first release is a local manual capture and search MVP:
 
@@ -26,19 +28,29 @@ The first release is a local manual capture and search MVP:
 4. Runnable local `dev`/`serve` API startup.
 5. Documentation for the current setup, usage, and limitations.
 
-Cited natural-language query answers are still a product goal, but they are planned as an
-optional AI/query capability rather than a requirement for the base app. Provider interfaces,
-Telegram/email/Discord connectors, embeddings, and optional Postgres + pgvector deployment
-profiles are later opt-in modules because they require model/provider, connector, or heavier
-deployment work beyond the first local capture/search slice. See
-[ADR-007](docs/decisions/ADR-007-optional-capability-modules.md).
+### v0.2.0 cited-query foundation
+
+v0.2.0 adds the cited-query foundation without making AI a base requirement. The WSGI app
+exposes `POST /v1/query`, but the built-in `query-ai` capability is `default_enabled=False`, so
+normal `dev` and `serve` runs return a typed `503 CAPABILITY_DISABLED` response until an embedded
+or test harness deliberately supplies an enabled capability registry. The implemented foundation
+uses deterministic SQLite FTS retrieval plus a local/mock answerer; it does not require real model
+credentials and does not make hosted-model calls.
+
+This release is intentionally narrow: it is not general web search, connector ingestion,
+embeddings, hybrid/vector search, a full provider ecosystem, a browser/mobile UI, production
+auth/multi-user ownership, or a public internet service. Assume localhost or a private network such
+as Tailscale unless you add your own access control. Provider interfaces, Telegram/email/Discord
+connectors, embeddings, and optional Postgres + pgvector deployment profiles remain later opt-in
+modules. See [ADR-007](docs/decisions/ADR-007-optional-capability-modules.md).
 
 ## Development status
 
 This repository now has a runnable local SQLite path, deterministic migrations, an importable
-WSGI API for manual capture and FTS-backed search, and `dev`/`serve` commands that start the
-local API after applying pending migrations. External connectors, provider-backed answer
-generation, and packaged deployment assets are still planned. See:
+WSGI API for manual capture, FTS-backed search, and default-disabled cited query, plus `dev`/`serve`
+commands that start the local API after applying pending migrations. External connectors, real
+provider-backed answer generation, embeddings/hybrid search, UI, production auth, and packaged
+deployment assets are still planned. See:
 
 - [Development standards](CONTRIBUTING.md)
 - [Architecture overview](docs/architecture.md)
@@ -171,6 +183,57 @@ Results are ordered by SQLite `bm25(idea_fts)` score, then newest `captured_at`,
 idea id. Snippets highlight matches from idea text with `<mark>...</mark>`. The endpoint does
 not expose raw idea text or raw payload bodies in the response.
 
+## Cited query foundation
+
+The WSGI app exposes cited query as:
+
+```text
+POST /v1/query
+```
+
+`query-ai` is disabled by default. In a normal local `dev` or `serve` run, this request returns
+`503 Service Unavailable` with the standard error envelope and does not validate the body, run
+retrieval, initialize providers, or make network calls:
+
+```json
+{
+  "error": {
+    "code": "CAPABILITY_DISABLED",
+    "message": "Cited query is not enabled for this Idea Inbox instance.",
+    "details": {
+      "capability": "query-ai",
+      "status": "disabled",
+      "reason": "Enable and configure the query-ai capability before using POST /v1/query."
+    }
+  }
+}
+```
+
+The current release has no public CLI or `.env` switch that enables query for `idea-inbox dev` or
+`idea-inbox serve`. Setting `IDEA_INBOX_CHAT_PROVIDER=mock` alone is only reserved configuration;
+it does not enable query in the packaged server path. Tests and embedded local harnesses can enable
+the foundation by constructing `create_app(...)` with a `CapabilityRegistry` that supplies:
+
+- an installed deterministic `model-provider` capability,
+- `enabled_overrides={"query-ai": True}`, and
+- `config_values={"IDEA_INBOX_CHAT_PROVIDER": "mock"}`.
+
+To disable it again, remove the override, set `enabled_overrides={"query-ai": False}`, or use the
+default `CapabilityRegistry()`.
+
+When enabled this foundation validates `{ "query": "...", "limit": 10, "filters": {"source":
+"manual"}, "include_hits": true }`, retrieves stored ideas through SQLite FTS, resolves each hit
+through authoritative storage, and returns either:
+
+- `answer.grounding == "stored_ideas"` with non-empty citations pointing to persisted ideas, safe
+  source metadata, and provenance IDs when available, or
+- `answer.grounding == "no_relevant_stored_ideas"` with empty `citations` and `hits`.
+
+It is not general web search and it cannot answer from uncaptured connector data, embeddings, model
+world knowledge, or raw event payload bodies. See
+[the cited-query API contract](docs/specs/cited-query-api-contract.md) for the full request,
+response, citation, and fabrication rules.
+
 ## Optional module roadmap
 
 The default install should continue to support manual capture and SQLite keyword search without
@@ -295,9 +358,9 @@ print the local API URL, and then serve requests until stopped by the operator.
 
 | Command | Purpose | Current behavior |
 | --- | --- | --- |
-| `uv run idea-inbox dev [--host 127.0.0.1] [--port 8080] [--database ./data/idea-inbox.sqlite3]` | Start the local development API using SQLite and mock/local providers by default. | Applies SQLite migrations, serves `/v1/ideas` and `/v1/ideas/search`, and exits when stopped. |
+| `uv run idea-inbox dev [--host 127.0.0.1] [--port 8080] [--database ./data/idea-inbox.sqlite3]` | Start the local development API using SQLite and mock/local providers by default. | Applies SQLite migrations, serves `/v1/ideas`, `/v1/ideas/search`, and default-disabled `/v1/query`, and exits when stopped. |
 | `uv run idea-inbox migrate [--database ./data/idea-inbox.sqlite3]` | Apply deterministic SQLite storage migrations, including the FTS5 projection. | Applies migrations and exits `0`; exits `1` with an actionable error if configuration is invalid, SQLite FTS5 is unavailable, or a migration fails. |
-| `uv run idea-inbox serve [--host 127.0.0.1] [--port 8080] [--database ./data/idea-inbox.sqlite3]` | Start the configured `/v1` API for local or self-hosted use. | Applies SQLite migrations, serves `/v1/ideas` and `/v1/ideas/search`, and exits when stopped. |
+| `uv run idea-inbox serve [--host 127.0.0.1] [--port 8080] [--database ./data/idea-inbox.sqlite3]` | Start the configured `/v1` API for local or self-hosted use. | Applies SQLite migrations, serves `/v1/ideas`, `/v1/ideas/search`, and default-disabled `/v1/query`, and exits when stopped. |
 
 Help and validation:
 

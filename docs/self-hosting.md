@@ -19,8 +19,9 @@ uv run idea-inbox dev --host 127.0.0.1 --port 8080
 
 Local/mock mode is the privacy-preserving default for development: it must not require
 hosted-model credentials, hidden outbound model calls, connector tokens, vector databases, or
-telemetry. Hosted/local model providers and AI-assisted query may be configured explicitly later,
-but they are optional modules rather than requirements for local development.
+telemetry. The v0.2.0 cited-query foundation is present but remains disabled by default for normal
+`dev` and `serve` runs; hosted/local model providers and richer query modules are optional later
+work rather than requirements for local development.
 
 The WSGI API app is available as `idea_inbox.api.create_app`, and the CLI server wrapper starts
 it after applying pending SQLite migrations. It currently exposes:
@@ -29,8 +30,10 @@ it after applying pending SQLite migrations. It currently exposes:
   stores a `manual` raw event first, then persists the derived draft and canonical idea.
 - `GET /v1/ideas/search?q=...&limit=10` for SQLite FTS-backed search over stored ideas.
 - `POST /v1/query` for cited answers when the optional `query-ai` capability is enabled.
-  The default release path keeps this capability disabled unless a deterministic/mock provider is
-  explicitly configured; no hosted model credentials or provider SDKs are required for smoke tests.
+  The public `dev`/`serve` path uses the default registry, so `query-ai` is disabled and the route
+  returns `503 CAPABILITY_DISABLED` without retrieval or provider work. Embedded deterministic/mock
+  harnesses can enable it by supplying an enabled `CapabilityRegistry` to `create_app(...)`; no
+  hosted model credentials or provider SDKs are required for those smoke tests.
 
 `dev` is the local development entrypoint. `serve` exposes the same API with explicit host/port
 options for local or self-hosted use. Production packaging still needs a Dockerfile, Compose file,
@@ -112,6 +115,46 @@ MVP exposure notes:
 - Replayed manual `POST /v1/ideas` requests are idempotent by `idempotency_key` when supplied, or
   by a dedupe key derived from the normalized request body when no key is supplied.
 
+
+## Cited query capability
+
+`POST /v1/query` is available in the WSGI route table, but self-hosted operators should treat it as
+a default-disabled v0.2.0 foundation. The built-in `query-ai` capability has
+`default_enabled=False` and depends on `sqlite-fts-search`, `model-provider`, and
+`IDEA_INBOX_CHAT_PROVIDER` when enabled. Normal CLI startup does not install a model-provider
+capability or apply an enabled override, so this curl works as a safe disabled-path smoke test and
+does not need model credentials:
+
+```bash
+curl -i -X POST http://127.0.0.1:8080/v1/query \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"What ideas did I save about local AI?"}'
+```
+
+Expected default response: `503 Service Unavailable` with `error.code == "CAPABILITY_DISABLED"`,
+`error.details.capability == "query-ai"`, and `error.details.status == "disabled"`. The disabled
+path exits before request validation, SQLite retrieval, model-provider setup, or outbound network
+calls.
+
+Current enable/disable surface:
+
+- Disable: use the default `CapabilityRegistry()`, omit a `query-ai` override, or explicitly pass
+  `enabled_overrides={"query-ai": False}` in an embedded/test harness. This is what `dev` and
+  `serve` do today.
+- Enable for deterministic local tests only: construct the WSGI app with a `CapabilityRegistry`
+  that installs a mock `model-provider`, sets `enabled_overrides={"query-ai": True}`, and provides
+  `config_values={"IDEA_INBOX_CHAT_PROVIDER": "mock"}`. The canonical example is
+  `tests/test_api_query.py::deterministic_query_registry`.
+- Not implemented yet: a CLI flag, `.env` toggle, provider package discovery, real hosted/local
+  model adapters, streaming, embeddings, hybrid search, public query UI, or production auth. Setting
+  `IDEA_INBOX_CHAT_PROVIDER=mock` in `.env` alone does not enable query for the packaged server.
+
+When enabled by a harness, query only answers from stored ideas in the configured SQLite database.
+It is not general web search, does not ingest connector data, does not read raw event payload bodies
+as answer text, and returns a no-evidence response instead of fabricating an answer when FTS finds
+nothing relevant. Keep `dev`/`serve` bound to `127.0.0.1` or reachable only through a private
+network such as Tailscale unless you add your own authentication and network controls.
+
 ## Resetting a local development database
 
 For disposable local development data, stop any running Idea Inbox process, delete the
@@ -129,9 +172,9 @@ removes the raw-event trail, drafts, ideas, tags, and search projection together
 ## Planned lightweight self-hosting
 
 The intended lightweight self-host path is the current SQLite-backed WSGI API packaged for a
-single host. Optional modules can add AI-assisted query, model providers, connectors, embeddings,
-or richer deployment profiles, but the base self-host path should remain capture + SQLite search
-without mandatory AI. A Docker image may become the convenient packaging format once the
+single host. Optional modules can add richer AI-assisted query, real model providers, connectors, embeddings,
+or deployment profiles, but the base self-host path should remain capture + SQLite search with
+default-disabled query and no mandatory AI. A Docker image may become the convenient packaging format once the
 repository includes a Dockerfile and a published image exists.
 
 ## Planned production self-hosting

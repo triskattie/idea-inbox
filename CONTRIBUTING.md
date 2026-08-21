@@ -112,7 +112,9 @@ search and cited answers must resolve through stored `ideas` and stable idea IDs
 ### Cited query contract maintenance
 
 The v0.2.0 cited-query foundation is specified in
-`docs/specs/cited-query-api-contract.md`. Keep `POST /v1/query` behind the `query-ai` capability;
+`docs/specs/cited-query-api-contract.md`. The public `dev`/`serve` path keeps `query-ai` disabled
+by default; deterministic/mock query is enabled only by explicit in-process registry overrides.
+Keep `POST /v1/query` behind the `query-ai` capability;
 when disabled, unavailable, or misconfigured it returns `CAPABILITY_DISABLED` and must not retrieve,
 call providers, or make hidden network calls. Evidence-backed answers use
 `answer.grounding == "stored_ideas"` and require non-empty citations pointing to persisted `Idea`

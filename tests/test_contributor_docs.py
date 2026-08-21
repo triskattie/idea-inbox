@@ -243,7 +243,9 @@ def test_docs_define_optional_module_direction_before_ai_query() -> None:
     assert "disabled" in capability_spec
     assert "unavailable" in capability_spec
     assert "misconfigured" in capability_spec
-    assert "No AI query endpoint, model calls, embeddings" in capability_spec
+    assert (
+        "v0.2.0 adds a separate default-disabled deterministic query foundation" in capability_spec
+    )
 
 
 def test_docs_define_v020_cited_query_api_contract() -> None:
@@ -295,3 +297,25 @@ def test_docs_describe_implemented_capability_registry_contract() -> None:
     assert "Implemented in Phase 5" in capability_spec
     assert "`src/idea_inbox/capabilities/registry.py`" in capability_spec
     assert "CapabilityRegistry(installed_capabilities=(provider,))" in capability_spec
+
+
+def test_docs_describe_v020_release_scope_and_default_disabled_query() -> None:
+    readme = read_doc("README.md")
+    self_hosting = read_doc("docs/self-hosting.md")
+    providers = read_doc("docs/providers.md")
+    architecture = read_doc("docs/architecture.md")
+    changelog = read_doc("CHANGELOG.md")
+
+    for doc in (readme, self_hosting, providers, architecture):
+        assert "default" in doc.lower()
+        assert "query-ai" in doc
+
+    assert "## [0.2.0] - Unreleased" in changelog
+    assert "Default-disabled cited-query foundation at `POST /v1/query`" in changelog
+    assert "General web search" in changelog
+    assert "Setting `IDEA_INBOX_CHAT_PROVIDER=mock` alone" in readme
+    assert 'enabled_overrides={"query-ai": True}' in self_hosting
+    assert "IDEA_INBOX_CHAT_PROVIDER=mock` in `.env` alone does not enable query" in self_hosting
+    assert "not general web search" in readme
+    assert "not general model-provider support" in providers
+    assert "Current cited-query foundation" in architecture

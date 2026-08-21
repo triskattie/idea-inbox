@@ -42,6 +42,23 @@ current search projection.
 the joined `ideas` row. Query answers must continue to resolve search hits back through stored
 ideas before presenting citations.
 
+
+## Current cited-query foundation
+
+`POST /v1/query` is implemented as an optional route behind `query-ai`. The default registry leaves
+`query-ai` disabled, so base startup, migration, capture, and FTS search do not require a model
+provider and the query route returns `CAPABILITY_DISABLED` before retrieval.
+
+When a test or embedded harness supplies an enabled registry with a deterministic mock
+`model-provider`, the query path validates the request, retrieves hits from SQLite FTS, resolves
+those hits through authoritative storage, and builds citations from persisted `Idea` records. The
+answerer may return only stored-idea claims backed by citations, or the explicit
+`no_relevant_stored_ideas` response when no evidence resolves.
+
+This foundation intentionally excludes general web search, connector ingestion, embeddings or
+hybrid search, real provider adapters, UI, production auth, multi-user ownership, and public
+exposure.
+
 ## Design priorities
 
 1. Lightweight default deployment.

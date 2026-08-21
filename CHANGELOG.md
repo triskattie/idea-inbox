@@ -4,6 +4,31 @@ All notable changes to Idea Inbox will be documented here.
 
 The format follows Keep a Changelog-style sections: Added, Changed, Deprecated, Removed, Fixed, Security.
 
+## [0.2.0] - Unreleased
+
+### Added
+
+- Default-disabled cited-query foundation at `POST /v1/query`, guarded by the built-in `query-ai`
+  capability and returning `503 CAPABILITY_DISABLED` in normal local `dev`/`serve` runs.
+- Deterministic local/mock query behavior for tests and embedded harnesses: SQLite FTS retrieval,
+  storage-backed citation resolution, evidence-backed answers, and explicit no-evidence responses.
+- Cited-query API contract documentation covering request validation, success/no-evidence/error
+  response shapes, citation/provenance requirements, and fabrication rules.
+
+### Changed
+
+- Capability documentation now names `query-ai` as a built-in query capability that is present but
+  disabled by default, with enablement limited to explicit in-process registry overrides for the
+  v0.2.0 foundation.
+- Self-hosting docs now describe the safe default disabled query path and localhost/private-network
+  exposure assumptions.
+
+### Deferred
+
+- General web search, connector ingestion, embeddings/vector or hybrid search, real hosted/local
+  provider adapters, provider package discovery, streaming, UI, production auth, multi-user
+  ownership, and public internet exposure remain outside v0.2.0.
+
 ## [0.1.0] - 2026-08-16
 
 ### Added

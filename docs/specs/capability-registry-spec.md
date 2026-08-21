@@ -21,7 +21,7 @@ In scope for Phase 5:
 
 Out of scope for Phase 5:
 
-- No AI query endpoint, model calls, embeddings, vector search, platform connector runtimes, plugin marketplace, package installer, or module hot-loading.
+- No AI query endpoint in Phase 5 itself; v0.2.0 adds a separate default-disabled deterministic query foundation. Still out of scope for the registry are real model calls, embeddings, vector search, platform connector runtimes, plugin marketplace, package installer, or module hot-loading.
 - No secret persistence or OAuth/device-login implementation.
 - No requirement for third-party dependencies in the base install.
 

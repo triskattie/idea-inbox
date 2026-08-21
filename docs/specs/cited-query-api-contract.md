@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted foundation contract for the v0.2.0 cited-query slice. This document specifies the deterministic local/mock API and answer contract before real model-provider adapters, embeddings, connectors, production auth, UI, or public exposure are added.
+Accepted and implemented foundation contract for the v0.2.0 cited-query slice. This document specifies the deterministic local/mock API and answer contract before real model-provider adapters, embeddings, connectors, production auth, UI, or public exposure are added.
 
 ## Objective
 
@@ -37,7 +37,7 @@ Out of scope for this foundation:
 Minimum dependency expectations:
 
 - `query-ai` depends on `core` and an enabled search capability such as `sqlite-fts-search`.
-- The v0.2.0 foundation may use a deterministic built-in/mock answerer when explicitly enabled for tests or local development.
+- The v0.2.0 foundation uses a deterministic built-in/mock answerer when explicitly enabled by tests or an embedded local harness.
 - Real model providers remain disabled/unavailable until later provider-adapter work deliberately installs and enables them.
 - If `query-ai` is disabled, unavailable, or misconfigured, the route returns a typed capability-disabled error instead of a no-evidence answer.
 
@@ -62,6 +62,22 @@ Capability-disabled response:
 ```
 
 `details.status` should use capability registry vocabulary when available: `disabled`, `misconfigured`, or `unavailable`. Error details must not expose secret values or raw provider configuration.
+
+
+## Current enablement surface
+
+The public CLI server path constructs `create_app()` with the default `CapabilityRegistry()`, so
+`query-ai` remains disabled even if `.env` contains `IDEA_INBOX_CHAT_PROVIDER=mock`. Current
+enablement is intentionally limited to in-process tests or embedded harnesses that pass a custom
+registry to `create_app(capability_registry=...)` with:
+
+- an installed deterministic `model-provider` capability,
+- `enabled_overrides={"query-ai": True}`, and
+- `config_values={"IDEA_INBOX_CHAT_PROVIDER": "mock"}`.
+
+Disabling query means using the default registry, omitting the override, or explicitly passing
+`enabled_overrides={"query-ai": False}`. A public CLI flag, config-file setting, environment-only
+toggle, provider package discovery, and real provider adapter selection are later work.
 
 ## Request contract
 
@@ -241,7 +257,7 @@ Implementation and tests should enforce these invariants:
 
 ## Deterministic/mock foundation behavior
 
-The v0.2.0 foundation should be testable without real model calls:
+The implemented v0.2.0 foundation is testable without real model calls:
 
 1. Validate the request.
 2. Check the `query-ai` capability gate.
@@ -254,7 +270,7 @@ Normal tests must not call hosted models, local model daemons, connector APIs, e
 
 ## Test-driving checklist
 
-Downstream implementation tests should cover:
+Implementation tests cover or should continue covering:
 
 - `POST /v1/query` returns `CAPABILITY_DISABLED` when `query-ai` is disabled, unavailable, or misconfigured.
 - Request validation rejects non-object bodies, blank `query`, too-long `query`, invalid `limit`, invalid filters, and unknown filter keys.
