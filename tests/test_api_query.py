@@ -1,6 +1,8 @@
 import json
+from collections.abc import Sequence
 from io import BytesIO
 from pathlib import Path
+from typing import Any
 from wsgiref.util import setup_testing_defaults
 
 from idea_inbox.api import create_app
@@ -9,6 +11,21 @@ from idea_inbox.core.models import Idea, IdeaDraft, RawEvent
 from idea_inbox.providers.capabilities import provider_capabilities
 from idea_inbox.providers.mock import MockModelProvider
 from idea_inbox.storage.sqlite import SQLiteStorageBackend
+
+
+class BrokenModelProvider:
+    mode: str = "broken"
+    provider_name: str | None = "broken"
+
+    def answer(
+        self,
+        *,
+        query: str,
+        evidence: Sequence[Any],
+        options: Any = None,
+    ) -> Any:
+        raise ValueError("provider response malformed")
+
 
 DISABLED_QUERY_REASON = "Enable and configure the query-ai capability before using POST /v1/query."
 
@@ -201,6 +218,46 @@ def test_query_disabled_does_not_break_manual_capture_migrations_or_existing_sea
         storage.close()
 
 
+def test_enabled_query_rejects_invalid_request_body_and_limit(tmp_path: Path) -> None:
+    app = create_app(
+        database_path=tmp_path / "ideas.sqlite3",
+        capability_registry=deterministic_query_registry(),
+    )
+
+    body_status, _headers, body_payload = request(app, "/v1/query", raw_body=b'"not an object"')
+    limit_status, _headers, limit_payload = request(
+        app,
+        "/v1/query",
+        json_body={"query": "local AI", "limit": 0},
+    )
+
+    assert body_status == "400 Bad Request"
+    assert body_payload == {
+        "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Request body must be a JSON object.",
+            "details": {"field": "body"},
+        }
+    }
+    assert limit_status == "400 Bad Request"
+    assert limit_payload == {
+        "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Query limit must be between 1 and 50.",
+            "details": {"field": "limit"},
+        }
+    }
+
+
+def test_query_disabled_returns_capability_error_without_reading_body(tmp_path: Path) -> None:
+    app = create_app(database_path=tmp_path / "ideas.sqlite3")
+
+    status, _headers, payload = request(app, "/v1/query", raw_body=b"not-json")
+
+    assert status == "503 Service Unavailable"
+    assert payload["error"]["code"] == "CAPABILITY_DISABLED"
+
+
 def test_enabled_deterministic_query_returns_stored_idea_answer_with_citations(
     tmp_path: Path,
 ) -> None:
@@ -273,6 +330,33 @@ def test_enabled_query_uses_injected_model_provider_boundary(tmp_path: Path) -> 
     assert payload["answer"]["grounding"] == "stored_ideas"
     assert payload["meta"]["answer_mode"] == "deterministic_mock"
     assert payload["meta"]["model_provider"] == "mock-injected"
+
+
+def test_enabled_query_provider_value_error_is_not_reported_as_limit_validation(
+    tmp_path: Path,
+) -> None:
+    database_path = tmp_path / "ideas.sqlite3"
+    seed_query_database(database_path)
+    app = create_app(
+        database_path=database_path,
+        capability_registry=deterministic_query_registry(),
+        model_provider=BrokenModelProvider(),
+    )
+
+    status, _headers, payload = request(
+        app,
+        "/v1/query",
+        json_body={"query": "What did I save about local AI?", "limit": 5},
+    )
+
+    assert status == "502 Bad Gateway"
+    assert payload["error"] != {
+        "code": "VALIDATION_ERROR",
+        "message": "Query limit must be between 1 and 50.",
+        "details": {"field": "limit"},
+    }
+    assert payload["error"]["code"] == "PROVIDER_ERROR"
+    assert payload["error"]["details"] == {"provider": "broken"}
 
 
 def test_enabled_deterministic_query_returns_no_evidence_without_citations(

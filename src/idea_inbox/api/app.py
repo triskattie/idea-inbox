@@ -237,7 +237,7 @@ def _query_response(
             "400 Bad Request",
             _error("VALIDATION_ERROR", exc.message, {"field": exc.field}),
         )
-    except (EmptySearchQuery, SearchLimitError, ValueError):
+    except (EmptySearchQuery, SearchLimitError):
         return _json_response(
             start_response,
             "400 Bad Request",
@@ -245,6 +245,16 @@ def _query_response(
                 "VALIDATION_ERROR",
                 f"Query limit must be between 1 and {MAX_LIMIT}.",
                 {"field": "limit"},
+            ),
+        )
+    except ValueError:
+        return _json_response(
+            start_response,
+            "502 Bad Gateway",
+            _error(
+                "PROVIDER_ERROR",
+                "Query provider could not answer the request.",
+                {"provider": getattr(model_provider, "provider_name", None)},
             ),
         )
     except (OSError, sqlite3.Error, SQLiteMigrationError):

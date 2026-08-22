@@ -131,6 +131,26 @@ Validation failures use the standard error envelope:
 }
 ```
 
+Provider-boundary failures after request validation and retrieval, such as missing adapter credentials
+or malformed hosted/local model responses, use a provider error instead of the validation envelope:
+
+```text
+502 Bad Gateway
+```
+
+```json
+{
+  "error": {
+    "code": "PROVIDER_ERROR",
+    "message": "Query provider could not answer the request.",
+    "details": { "provider": "mock" }
+  }
+}
+```
+
+Provider error details may include a non-secret provider name, but must not expose credentials,
+raw provider payloads, or SDK exception text.
+
 ## Success response with evidence
 
 A successful evidence-backed answer returns `200 OK`.
@@ -281,6 +301,7 @@ Implementation tests cover or should continue covering:
 
 - `POST /v1/query` returns `CAPABILITY_DISABLED` when `query-ai` is disabled, unavailable, or misconfigured.
 - Request validation rejects non-object bodies, blank `query`, too-long `query`, invalid `limit`, invalid filters, and unknown filter keys.
+- Provider-boundary failures return `PROVIDER_ERROR` and are not reported as request validation or limit errors.
 - Evidence-backed responses include `answer.grounding == "stored_ideas"`, at least one citation, and citation `idea_id` values that exist in storage.
 - Search hits are resolved through storage before citation creation.
 - Missing/deleted ideas referenced by stale search hits are not cited.
