@@ -1,0 +1,22 @@
+{
+  "op": 0,
+  "s": 42,
+  "t": "MESSAGE_CREATE",
+  "d": {
+    "id": "1136811000000000001",
+    "channel_id": "1136812000000000002",
+    "guild_id": "1136813000000000003",
+    "author": {
+      "id": "1136814000000000004",
+      "username": "tris",
+      "global_name": "Tris",
+      "bot": false
+    },
+    "content": "Prototype Discord capture into Idea Inbox.",
+    "timestamp": "2026-08-22T10:15:30.000000+00:00",
+    "edited_timestamp": null,
+    "attachments": [],
+    "embeds": [],
+    "mentions": []
+  }
+}

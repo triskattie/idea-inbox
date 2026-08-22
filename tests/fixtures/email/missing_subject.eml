@@ -1,0 +1,7 @@
+Message-ID: <missing-subject-3@example.test>
+From: no-subject@example.test
+To: inbox@example.test
+Date: Fri, 21 Aug 2026 12:30:00 +0000
+Content-Type: text/plain; charset="utf-8"
+
+Inbox items without subjects should still become drafts.

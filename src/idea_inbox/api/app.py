@@ -11,6 +11,7 @@ from urllib.parse import parse_qs
 
 from idea_inbox.capabilities.registry import CapabilityRegistry
 from idea_inbox.config import AppConfig, ConfigError, load_config
+from idea_inbox.connectors.webhook import GenericWebhookConnector
 from idea_inbox.core.capabilities import CapabilityStatus
 from idea_inbox.core.manual_capture import (
     ManualIdeaPayload,
@@ -24,11 +25,16 @@ from idea_inbox.core.query import (
     answer_query,
     validate_query_request,
 )
-from idea_inbox.core.services import create_manual_idea
+from idea_inbox.core.services import create_manual_idea, ingest_connector_event
 from idea_inbox.search.sqlite_fts import DEFAULT_LIMIT, MAX_LIMIT, SQLiteFTSSearchIndex
 from idea_inbox.storage.sqlite import SQLiteMigrationError, SQLiteStorageBackend
 
 QUERY_DISABLED_REASON = "Enable and configure the query-ai capability before using POST /v1/query."
+GENERIC_WEBHOOK_CAPABILITY = "generic-webhook-connector"
+GENERIC_WEBHOOK_DISABLED_REASON = (
+    "Enable the generic-webhook-connector capability before using "
+    "POST /v1/connectors/webhook/generic."
+)
 
 StartResponse = Callable[[str, list[tuple[str, str]]], None]
 WSGIApp = Callable[[dict[str, Any], StartResponse], Iterable[bytes]]
@@ -65,6 +71,14 @@ def create_app(
                 resolved_database_path,
                 resolved_capability_registry,
                 model_provider,
+            )
+
+        if method == "POST" and path == "/v1/connectors/webhook/generic":
+            return _generic_webhook_response(
+                start_response,
+                environ,
+                resolved_database_path,
+                resolved_capability_registry,
             )
 
         if method != "GET" or path != "/v1/ideas/search":
@@ -141,6 +155,47 @@ def _search_payload(database_path: str | Path, query: str, limit: int) -> dict[s
         ],
         "page": {"limit": limit, "next_cursor": None},
     }
+
+
+def _generic_webhook_response(
+    start_response: StartResponse,
+    environ: dict[str, Any],
+    database_path: str | Path,
+    capability_registry: CapabilityRegistry,
+) -> list[bytes]:
+    capability = capability_registry.get_capability(GENERIC_WEBHOOK_CAPABILITY)
+    if capability is None or capability.status != CapabilityStatus.ENABLED:
+        status = capability.status.value if capability is not None else "unavailable"
+        return _json_response(
+            start_response,
+            "503 Service Unavailable",
+            _error(
+                "CAPABILITY_DISABLED",
+                "Generic webhook ingestion is not enabled for this Idea Inbox instance.",
+                {
+                    "capability": GENERIC_WEBHOOK_CAPABILITY,
+                    "status": status,
+                    "reason": GENERIC_WEBHOOK_DISABLED_REASON,
+                },
+            ),
+        )
+
+    try:
+        payload = _create_generic_webhook_payload(database_path, _read_json_body(environ))
+    except ManualIdeaValidationError as exc:
+        return _json_response(
+            start_response,
+            "400 Bad Request",
+            _error("VALIDATION_ERROR", exc.message, {"field": exc.field}),
+        )
+    except (OSError, sqlite3.Error, SQLiteMigrationError):
+        return _json_response(
+            start_response,
+            "500 Internal Server Error",
+            _error("STORAGE_ERROR", "Webhook event could not be saved.", {}),
+        )
+
+    return _json_response(start_response, "201 Created", payload)
 
 
 def _query_response(
@@ -281,6 +336,27 @@ def _create_manual_idea_payload(
             "captured_at": result.idea.captured_at,
             "metadata": result.idea.metadata,
             "tags": list(result.idea.tags),
+        }
+    }
+
+
+def _create_generic_webhook_payload(database_path: str | Path, body: Any) -> dict[str, Any]:
+    storage = SQLiteStorageBackend(database_path)
+    try:
+        storage.migrate()
+        result = ingest_connector_event(storage, GenericWebhookConnector(), body)
+    finally:
+        storage.close()
+
+    return {
+        "item": {
+            "idea_id": result.ideas[0].id,
+            "text": result.ideas[0].text,
+            "source": result.ideas[0].source,
+            "source_ref": result.ideas[0].source_ref,
+            "captured_at": result.ideas[0].captured_at,
+            "metadata": result.ideas[0].metadata,
+            "tags": list(result.ideas[0].tags),
         }
     }
 

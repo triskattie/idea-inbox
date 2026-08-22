@@ -1,0 +1,19 @@
+{
+  "update_id": 900001002,
+  "message": {
+    "message_id": 77,
+    "date": 1787402400,
+    "chat": {
+      "id": -1009876543210,
+      "type": "supergroup",
+      "title": "Idea Lab"
+    },
+    "from": {
+      "id": 515151,
+      "is_bot": false,
+      "first_name": "Grace",
+      "username": "grace_h"
+    },
+    "text": "Group note: test connector idempotency with provider IDs."
+  }
+}

@@ -3,9 +3,94 @@
 from collections.abc import Iterator, Sequence
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
-from typing import Any, Protocol
+from hashlib import sha256
+from typing import Any, Protocol, runtime_checkable
 
 from idea_inbox.core.models import Idea, IdeaDraft, RawEvent, SearchHit
+
+
+@dataclass(frozen=True)
+class RawEventInput:
+    """Connector-built raw event fields before core assigns internal IDs."""
+
+    source: str
+    provider_event_id: str | None
+    dedupe_key: str
+    occurred_at: str | None
+    actor_ref: str | None
+    payload: str
+
+    def payload_hash(self) -> str:
+        return sha256(self.payload.encode("utf-8")).hexdigest()
+
+    def to_raw_event(self, *, raw_event_id: str, received_at: str) -> RawEvent:
+        return RawEvent(
+            id=raw_event_id,
+            source=self.source,
+            provider_event_id=self.provider_event_id,
+            dedupe_key=self.dedupe_key,
+            received_at=received_at,
+            occurred_at=self.occurred_at,
+            actor_ref=self.actor_ref,
+            payload=self.payload,
+            payload_hash=self.payload_hash(),
+            processing_state="pending",
+        )
+
+
+@dataclass(frozen=True)
+class IdeaDraftInput:
+    """Connector-extracted idea candidate before core assigns an internal ID."""
+
+    text: str
+    source_created_at: str | None = None
+    source_uri: str | None = None
+    metadata: dict[str, Any] | None = None
+    tags: tuple[str, ...] = ()
+
+    def to_idea_draft(self, raw_event_id: str, *, draft_id: str) -> IdeaDraft:
+        return IdeaDraft(
+            id=draft_id,
+            raw_event_id=raw_event_id,
+            text=self.text,
+            source_created_at=self.source_created_at,
+            source_uri=self.source_uri,
+            metadata=self.metadata or {},
+            extraction_state="accepted",
+        )
+
+
+@dataclass(frozen=True)
+class ValidatedConnectorEvent:
+    """SDK-free validated connector payload ready for shared ingestion."""
+
+    source: str
+    raw_event: RawEventInput
+    drafts: tuple[IdeaDraftInput, ...] = ()
+
+
+@runtime_checkable
+class Connector(Protocol):
+    """SDK-free adapter boundary for optional external event sources.
+
+    Adapters validate untrusted payloads at the boundary, build one persisted
+    raw event input per incoming event, and extract zero or more idea drafts
+    from a stored raw event. Provider SDK types must not leak through this
+    contract.
+    """
+
+    name: str
+
+    def validate(
+        self,
+        payload: Any,
+        headers: dict[str, str] | None = None,
+        credentials: Any | None = None,
+    ) -> ValidatedConnectorEvent: ...
+
+    def to_raw_event_input(self, validated_event: ValidatedConnectorEvent) -> RawEventInput: ...
+
+    def extract_drafts(self, raw_event: RawEvent) -> list[IdeaDraftInput]: ...
 
 
 class AnswerEvidence(Protocol):

@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from idea_inbox.core.manual_capture import ManualIdeaPayload
 from idea_inbox.core.models import Idea, IdeaDraft, RawEvent
-from idea_inbox.core.ports import StorageBackend
+from idea_inbox.core.ports import Connector, StorageBackend
 
 
 @dataclass(frozen=True)
@@ -18,6 +18,14 @@ class ManualIdeaResult:
     raw_event: RawEvent
     draft: IdeaDraft
     idea: Idea
+
+
+@dataclass(frozen=True)
+class ConnectorIngestResult:
+    raw_event: RawEvent
+    drafts: tuple[IdeaDraft, ...]
+    ideas: tuple[Idea, ...]
+    duplicate: bool = False
 
 
 def create_manual_idea(storage: StorageBackend, payload: ManualIdeaPayload) -> ManualIdeaResult:
@@ -80,6 +88,72 @@ def create_manual_idea(storage: StorageBackend, payload: ManualIdeaPayload) -> M
     )
     processed_raw_event = storage.update_raw_event_processing_state(raw_event.id, "processed")
     return ManualIdeaResult(raw_event=processed_raw_event or raw_event, draft=draft, idea=idea)
+
+
+def ingest_connector_event(
+    storage: StorageBackend,
+    connector: Connector,
+    payload: object,
+    *,
+    headers: dict[str, str] | None = None,
+    credentials: object | None = None,
+) -> ConnectorIngestResult:
+    """Persist one raw event before extracting drafts and canonical ideas.
+
+    Idempotent by the adapter's ``(source, dedupe_key)``: replays return the
+    existing raw event lineage without creating duplicates.
+    """
+    validated_event = connector.validate(payload, headers, credentials)
+    raw_event_input = connector.to_raw_event_input(validated_event)
+    now = _utc_now()
+    raw_event = storage.save_raw_event(
+        raw_event_input.to_raw_event(raw_event_id=_new_id("raw"), received_at=now)
+    )
+
+    existing_drafts = tuple(storage.list_idea_drafts(raw_event_id=raw_event.id))
+    if existing_drafts:
+        return ConnectorIngestResult(
+            raw_event=raw_event,
+            drafts=existing_drafts,
+            ideas=tuple(storage.list_ideas(raw_event_id=raw_event.id)),
+            duplicate=True,
+        )
+
+    drafts: list[IdeaDraft] = []
+    ideas: list[Idea] = []
+    for draft_input in connector.extract_drafts(raw_event):
+        draft = storage.save_idea_draft(
+            draft_input.to_idea_draft(raw_event.id, draft_id=_new_id("draft"))
+        )
+        drafts.append(draft)
+        ideas.append(
+            storage.save_idea(
+                Idea(
+                    id=_new_id("idea"),
+                    raw_event_id=raw_event.id,
+                    draft_id=draft.id,
+                    text=draft.text,
+                    source=raw_event.source,
+                    source_ref=draft.source_uri,
+                    captured_at=draft.source_created_at or raw_event.occurred_at or now,
+                    created_at=now,
+                    updated_at=now,
+                    metadata=draft.metadata or {},
+                    tags=draft_input.tags,
+                    embedding_state="not_requested",
+                )
+            )
+        )
+    if not drafts:
+        processed = storage.update_raw_event_processing_state(raw_event.id, "processed")
+        return ConnectorIngestResult(raw_event=processed or raw_event, drafts=(), ideas=())
+
+    processed_raw_event = storage.update_raw_event_processing_state(raw_event.id, "processed")
+    return ConnectorIngestResult(
+        raw_event=processed_raw_event or raw_event,
+        drafts=tuple(drafts),
+        ideas=tuple(ideas),
+    )
 
 
 def _manual_payload(payload: ManualIdeaPayload) -> str:

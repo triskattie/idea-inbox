@@ -1,0 +1,22 @@
+{
+  "update_id": 900001005,
+  "message": {
+    "message_id": 1002,
+    "date": 1787403600,
+    "chat": {
+      "id": 424242,
+      "type": "private",
+      "first_name": "Ada",
+      "username": "ada_local"
+    },
+    "from": {
+      "id": 424242,
+      "is_bot": false,
+      "first_name": "Ada",
+      "username": "ada_local"
+    },
+    "photo": [
+      {"file_id": "photo-small", "file_unique_id": "unique-small", "width": 90, "height": 90}
+    ]
+  }
+}

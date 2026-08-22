@@ -398,6 +398,14 @@ POST /v1/connectors/{connector_name}/events
 
 This endpoint is used for generic webhooks and future connector handlers. Connector modules own source-specific validation and conversion into raw events. Unsupported connector names return `404` or a typed `CONNECTOR_NOT_FOUND` error.
 
+Implemented generic webhook behavior currently exposes `POST /v1/connectors/webhook/generic` in
+the stdlib WSGI app. It is gated by the built-in `generic-webhook-connector` capability, which
+defaults to disabled. Disabled requests return `503 CAPABILITY_DISABLED` before body validation or
+storage writes. When enabled through an injected `CapabilityRegistry`, the route validates a JSON
+object with non-empty `text`, optional verbatim `event_id` for source-scoped idempotency, optional
+`source_ref`, `actor_ref`, `occurred_at`, `metadata`, and `tags`, then routes through the shared
+connector ingestion service to persist the raw event, draft, and idea.
+
 ### Search ideas
 
 ```text

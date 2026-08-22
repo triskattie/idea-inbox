@@ -63,6 +63,13 @@ def builtin_capabilities() -> tuple[Capability, ...]:
             description="Manual idea capture through the local API.",
         ),
         Capability(
+            name="generic-webhook-connector",
+            kind=CapabilityKind.CONNECTOR,
+            dependencies=("core", "sqlite-storage"),
+            default_enabled=False,
+            description="Generic JSON webhook ingestion connector.",
+        ),
+        Capability(
             name="sqlite-fts-search",
             kind=CapabilityKind.SEARCH,
             dependencies=("sqlite-storage",),

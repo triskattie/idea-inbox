@@ -155,6 +155,7 @@ Phase 5 should define at least these built-in records:
 | `manual-capture` | `connector` | enabled | Current `POST /v1/ideas` manual input path; depends on `core` and configured storage. |
 | `sqlite-storage` | `storage` | enabled | Current default persistence path; requires valid SQLite database location. |
 | `sqlite-fts-search` | `search` | enabled | Current keyword search projection; depends on `sqlite-storage`. |
+| `generic-webhook-connector` | `connector` | disabled | Generic JSON webhook ingestion; depends on `core` and `sqlite-storage`. |
 | `query-ai` | `query` | disabled | Planned cited natural-language query; depends on search plus a model provider. |
 
 Phase 7 provider records such as `model-provider`, `mock-model-provider`,
@@ -162,7 +163,9 @@ Phase 7 provider records such as `model-provider`, `mock-model-provider`,
 `none-credentials`, `env-api-key-credentials`, and `static-config-credentials` are installed only
 when explicitly supplied to `CapabilityRegistry(installed_capabilities=...)`; they default disabled
 and must not become base runtime prerequisites. Future connector records such as
-`telegram-connector`, `email-imap-connector`, and `discord-connector` follow the same rule.
+`telegram-connector`, `email-imap-connector`, and `discord-connector` follow the same rule. The
+generic webhook connector is discoverable as built-in metadata but remains disabled by default
+until an operator or in-process test harness enables it.
 
 ## Example capability record
 

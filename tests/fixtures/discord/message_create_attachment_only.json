@@ -1,0 +1,29 @@
+{
+  "op": 0,
+  "s": 44,
+  "t": "MESSAGE_CREATE",
+  "d": {
+    "id": "1136811000000000008",
+    "channel_id": "1136812000000000009",
+    "guild_id": "1136813000000000010",
+    "author": {
+      "id": "1136814000000000011",
+      "username": "designer",
+      "bot": false
+    },
+    "content": "",
+    "timestamp": "2026-08-22T10:17:30.000000+00:00",
+    "edited_timestamp": null,
+    "attachments": [
+      {
+        "id": "1136815000000000012",
+        "filename": "napkin-sketch.png",
+        "url": "https://cdn.discordapp.com/attachments/1136812000000000009/1136815000000000012/napkin-sketch.png",
+        "content_type": "image/png",
+        "size": 2048
+      }
+    ],
+    "embeds": [],
+    "mentions": []
+  }
+}

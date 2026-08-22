@@ -183,7 +183,10 @@ def test_docs_track_current_cli_api_and_manual_capture_surface() -> None:
 
     assert "## Implemented connectors" in connectors
     assert "- Manual API (`POST /v1/ideas`)" in connectors
+    assert "- Email fixture connector" in connectors
+    assert "It does not open IMAP connections" in connectors
     assert "- Manual API" not in connectors.split("## Planned connectors", 1)[1]
+    assert "- Email/IMAP\n" not in connectors.split("## Planned connectors", 1)[1]
 
     assert "Pydantic request/response schemas" not in contributing
     assert "dataclass request DTOs" in contributing

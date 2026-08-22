@@ -1,0 +1,14 @@
+{
+  "update_id": 900001003,
+  "channel_post": {
+    "message_id": 501,
+    "date": 1787402710,
+    "chat": {
+      "id": -1001234567890,
+      "type": "channel",
+      "title": "Ideas Broadcast",
+      "username": "ideas_broadcast"
+    },
+    "text": "Channel idea: keep fixture-driven connectors offline."
+  }
+}

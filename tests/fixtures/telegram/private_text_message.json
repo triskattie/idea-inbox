@@ -1,0 +1,20 @@
+{
+  "update_id": 900001001,
+  "message": {
+    "message_id": 1001,
+    "date": 1787402096,
+    "chat": {
+      "id": 424242,
+      "type": "private",
+      "first_name": "Ada",
+      "username": "ada_local"
+    },
+    "from": {
+      "id": 424242,
+      "is_bot": false,
+      "first_name": "Ada",
+      "username": "ada_local"
+    },
+    "text": "Prototype Telegram capture into Idea Inbox."
+  }
+}
