@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted and implemented foundation contract for the v0.2.0 cited-query slice. This document specifies the deterministic local/mock API and answer contract before real model-provider adapters, embeddings, connectors, production auth, UI, or public exposure are added.
+Accepted and implemented foundation contract for the v0.2.0 cited-query slice. Phase 7 adds
+SDK-free model-provider adapter boundaries, but the public `dev`/`serve` query surface remains the
+same: default disabled unless an in-process harness explicitly installs capabilities, enables them,
+and injects a provider.
 
 ## Objective
 
@@ -23,7 +26,7 @@ In scope for v0.2.0 foundation:
 
 Out of scope for this foundation:
 
-- Real hosted or local model-provider adapters.
+- Public CLI/`.env` enablement for hosted or local model-provider adapters.
 - Embeddings, vector search, hybrid ranking, reranking, or streaming answers.
 - External connector runtimes beyond already persisted ideas.
 - Browser/mobile UI, conversational sessions, public exposure, or production auth.
@@ -71,13 +74,17 @@ The public CLI server path constructs `create_app()` with the default `Capabilit
 enablement is intentionally limited to in-process tests or embedded harnesses that pass a custom
 registry to `create_app(capability_registry=...)` with:
 
-- an installed deterministic `model-provider` capability,
-- `enabled_overrides={"query-ai": True}`, and
+- installed provider capability metadata from `idea_inbox.providers.capabilities.provider_capabilities()`,
+- `enabled_overrides` for `query-ai`, `model-provider`, the selected provider capability, and its
+  credential-provider capability, and
 - `config_values={"IDEA_INBOX_CHAT_PROVIDER": "mock"}`.
 
 Disabling query means using the default registry, omitting the override, or explicitly passing
 `enabled_overrides={"query-ai": False}`. A public CLI flag, config-file setting, environment-only
-toggle, provider package discovery, and real provider adapter selection are later work.
+toggle, provider package discovery, and automatic provider construction from environment are later
+work. The Phase 7 OpenAI-compatible and Ollama adapters are implemented request-mapping boundaries
+for explicit harnesses; normal tests fake their HTTP boundary and do not call hosted APIs or local
+model daemons.
 
 ## Request contract
 
@@ -283,4 +290,7 @@ Implementation tests cover or should continue covering:
 
 ## Non-goals and future extensions
 
-Future specs may add real model providers, embeddings/hybrid search, streaming, auth, UI, provider selection, source/date filters, citations with byte/character offsets, or public exposure hardening. Those additions must remain additive to this foundation contract and must not relax the citation/fabrication invariants above.
+Future specs may add public provider enablement, automatic provider construction, embeddings/hybrid
+search, streaming, auth, UI, richer provider selection, source/date filters, citations with
+byte/character offsets, or public exposure hardening. Those additions must remain additive to this
+foundation contract and must not relax the citation/fabrication invariants above.

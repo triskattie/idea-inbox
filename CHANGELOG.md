@@ -12,6 +12,10 @@ The format follows Keep a Changelog-style sections: Added, Changed, Deprecated, 
   capability and returning `503 CAPABILITY_DISABLED` in normal local `dev`/`serve` runs.
 - Deterministic local/mock query behavior for tests and embedded harnesses: SQLite FTS retrieval,
   storage-backed citation resolution, evidence-backed answers, and explicit no-evidence responses.
+- Optional Phase 7 provider-adapter boundary: SDK-free model, embedding, and credential provider
+  protocols; installed capability metadata for mock, OpenAI-compatible, Ollama, embedding, and
+  credential providers; deterministic mock providers; and fakeable OpenAI-compatible/Ollama request
+  mappers for explicit harnesses.
 - Cited-query API contract documentation covering request validation, success/no-evidence/error
   response shapes, citation/provenance requirements, and fabrication rules.
 
@@ -25,9 +29,10 @@ The format follows Keep a Changelog-style sections: Added, Changed, Deprecated, 
 
 ### Deferred
 
-- General web search, connector ingestion, embeddings/vector or hybrid search, real hosted/local
-  provider adapters, provider package discovery, streaming, UI, production auth, multi-user
-  ownership, and public internet exposure remain outside v0.2.0.
+- General web search, connector ingestion, embeddings/vector or hybrid search, public provider
+  enablement, automatic provider construction from environment, provider package discovery,
+  streaming, UI, production auth, multi-user ownership, and public internet exposure remain outside
+  v0.2.0.
 
 ## [0.1.0] - 2026-08-16
 

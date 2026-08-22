@@ -2,9 +2,10 @@
 
 ## Status
 
-Implemented in Phase 5 for the SDK-free metadata contract and in-process registry. Later phases may
-add public HTTP/CLI surfaces, package discovery, provider implementations, connector runtimes,
-secret persistence, or OAuth/device-login flows, but those are not part of this phase.
+Implemented in Phase 5 for the SDK-free metadata contract and in-process registry. Phase 7 adds
+explicit provider capability declarations and adapter boundaries using the same registry shape.
+Later phases may add public HTTP/CLI surfaces, package discovery, connector runtimes, secret
+persistence, OAuth/device-login flows, or automatic provider construction from environment.
 
 ## Objective
 
@@ -31,7 +32,7 @@ Represent each capability as an immutable plain record, implemented as a datacla
 
 | Field | Shape | Meaning |
 | --- | --- | --- |
-| `name` | stable slug string | Unique identifier such as `core`, `manual-capture`, `sqlite-storage`, `sqlite-fts-search`, `query-ai`, `openai-compatible-provider`, or `telegram-connector`. Use lowercase kebab-case and treat names as public API. |
+| `name` | stable slug string | Unique identifier such as `core`, `manual-capture`, `sqlite-storage`, `sqlite-fts-search`, `query-ai`, `openai-compatible-model-provider`, or `telegram-connector`. Use lowercase kebab-case and treat names as public API. |
 | `kind` | enum/string | Category: `core`, `query`, `provider`, `connector`, `search`, or `storage`. Future kinds are additive. |
 | `dependencies` | list of capability names | Other capabilities that must be installed and enabled before this one can be enabled. Keep dependencies capability-level, not Python package names. |
 | `default_enabled` | bool | Whether the capability is enabled when present and no operator override exists. Core/base capabilities may default to `true`; AI, embeddings, external providers, platform connectors, and heavier deployment profiles default to `false`. |
@@ -124,7 +125,7 @@ from idea_inbox.capabilities.registry import CapabilityRegistry
 from idea_inbox.core.capabilities import Capability, CapabilityKind, ConfigRequirement
 
 provider = Capability(
-    name="openai-compatible-provider",
+    name="openai-compatible-model-provider",
     kind=CapabilityKind.PROVIDER,
     dependencies=("core",),
     default_enabled=False,
@@ -141,7 +142,7 @@ provider = Capability(
 )
 
 registry = CapabilityRegistry(installed_capabilities=(provider,))
-record = registry.get_capability("openai-compatible-provider")
+record = registry.get_capability("openai-compatible-model-provider")
 ```
 
 ## Built-in baseline capabilities
@@ -156,7 +157,12 @@ Phase 5 should define at least these built-in records:
 | `sqlite-fts-search` | `search` | enabled | Current keyword search projection; depends on `sqlite-storage`. |
 | `query-ai` | `query` | disabled | Planned cited natural-language query; depends on search plus a model provider. |
 
-Optional provider/connector records such as `openai-compatible-provider`, `ollama-provider`, `telegram-connector`, `email-imap-connector`, and `discord-connector` may be documented or stubbed as disabled/unavailable, but they must not become base runtime prerequisites.
+Phase 7 provider records such as `model-provider`, `mock-model-provider`,
+`openai-compatible-model-provider`, `ollama-model-provider`, `embedding-provider`,
+`none-credentials`, `env-api-key-credentials`, and `static-config-credentials` are installed only
+when explicitly supplied to `CapabilityRegistry(installed_capabilities=...)`; they default disabled
+and must not become base runtime prerequisites. Future connector records such as
+`telegram-connector`, `email-imap-connector`, and `discord-connector` follow the same rule.
 
 ## Example capability record
 
@@ -185,7 +191,7 @@ An enabled but incomplete provider might report:
 
 ```json
 {
-  "name": "openai-compatible-provider",
+  "name": "openai-compatible-model-provider",
   "kind": "provider",
   "origin": "installed",
   "default_enabled": false,
@@ -210,7 +216,7 @@ An enabled but incomplete provider might report:
     {
       "code": "missing_configuration",
       "field": "IDEA_INBOX_OPENAI_API_KEY",
-      "message": "Credential is required when openai-compatible-provider is enabled."
+      "message": "Credential is required when openai-compatible-model-provider is enabled."
     }
   ]
 }

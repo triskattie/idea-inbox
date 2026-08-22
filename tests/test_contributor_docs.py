@@ -271,8 +271,9 @@ def test_docs_define_v020_cited_query_api_contract() -> None:
     assert "RawEvent -> IdeaDraft -> Idea -> SearchHit -> Citation" in query_spec
     assert "must resolve each hit through authoritative storage by `idea_id`" in query_spec
     assert "must not return raw event payload bodies by default" in squashed_spec
-    assert "Real hosted or local model-provider adapters" in query_spec
-    assert "deterministic local/mock" in query_spec
+    assert "Public CLI/`.env` enablement for hosted or local model-provider adapters" in query_spec
+    assert "Phase 7 OpenAI-compatible and Ollama adapters" in query_spec
+    assert "deterministic/mock" in query_spec
 
 
 def test_docs_describe_implemented_capability_registry_contract() -> None:
@@ -314,8 +315,14 @@ def test_docs_describe_v020_release_scope_and_default_disabled_query() -> None:
     assert "Default-disabled cited-query foundation at `POST /v1/query`" in changelog
     assert "General web search" in changelog
     assert "Setting `IDEA_INBOX_CHAT_PROVIDER=mock` alone" in readme
-    assert 'enabled_overrides={"query-ai": True}' in self_hosting
+    assert "provider_capabilities()" in self_hosting
+    assert (
+        "`query-ai`, `model-provider`, `mock-model-provider`, and `none-credentials`"
+        in self_hosting
+    )
     assert "IDEA_INBOX_CHAT_PROVIDER=mock` in `.env` alone does not enable query" in self_hosting
     assert "not general web search" in readme
     assert "not general model-provider support" in providers
     assert "Current cited-query foundation" in architecture
+    assert "Phase 7 implements SDK-free provider-adapter boundaries" in architecture
+    assert "Optional Phase 7 provider-adapter boundary" in changelog

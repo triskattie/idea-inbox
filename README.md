@@ -71,9 +71,10 @@ uv run idea-inbox
 ```
 
 The default command prints top-level CLI help and exits `0`; it only verifies that the package and
-CLI entry point run. The local development path uses SQLite plus mock/local providers by default;
-it does not require hosted-model credentials, hidden outbound model calls, or telemetry. Run
-`uv run idea-inbox migrate` before using the importable WSGI API against a local database.
+CLI entry point run. The local development path uses SQLite with no provider capabilities enabled
+by default; it does not require hosted-model credentials, hidden outbound model calls, local model
+daemons, or telemetry. Run `uv run idea-inbox migrate` before using the importable WSGI API
+against a local database.
 
 ## SQLite setup
 
@@ -93,11 +94,12 @@ Configure the database location with one of these settings:
 Do not set `IDEA_INBOX_DATABASE_URL` and `IDEA_INBOX_SQLITE_PATH` together; startup and
 migration commands reject conflicting database location settings.
 
-Other keys in `.env.example` are reserved for planned providers, connectors, and an API access
-token gate. The current runtime only loads `IDEA_INBOX_ENV`, `IDEA_INBOX_LOG_LEVEL`,
-`IDEA_INBOX_DATABASE_URL`, and `IDEA_INBOX_SQLITE_PATH`; setting `IDEA_INBOX_API_KEY` does not
-protect `POST /v1/ideas` yet. Keep `serve` bound to `127.0.0.1` or put your own reverse proxy,
-network ACL, or access control in front of it before exposing the API.
+Other keys in `.env.example` are reserved for opt-in provider adapters, planned connectors, and an
+API access token gate. Provider keys are inert in normal `dev`/`serve` runs because those commands
+do not install or enable provider capabilities; setting `IDEA_INBOX_CHAT_PROVIDER=mock` does not
+enable `POST /v1/query`. The API-token and connector keys are still no-ops: setting
+`IDEA_INBOX_API_KEY` does not protect `POST /v1/ideas` yet. Keep `serve` bound to `127.0.0.1` or
+put your own reverse proxy, network ACL, or access control in front of it before exposing the API.
 
 Initialize or update the schema with:
 
@@ -217,8 +219,9 @@ The current release has no public CLI or `.env` switch that enables query for `i
 it does not enable query in the packaged server path. Tests and embedded local harnesses can enable
 the foundation by constructing `create_app(...)` with a `CapabilityRegistry` that supplies:
 
-- an installed deterministic `model-provider` capability,
+- installed provider capabilities from `idea_inbox.providers.capabilities.provider_capabilities()`,
 - `enabled_overrides={"query-ai": True}`, and
+- enabled overrides for `model-provider`, `mock-model-provider`, and `none-credentials`, plus
 - `config_values={"IDEA_INBOX_CHAT_PROVIDER": "mock"}`.
 
 To disable it again, remove the override, set `enabled_overrides={"query-ai": False}`, or use the
@@ -252,9 +255,12 @@ explicit module plan is:
    `no_relevant_stored_ideas` grounding value, and disabled query capability returns
    `CAPABILITY_DISABLED` without provider calls. Tests may use deterministic local/mock providers,
    but real model calls must require deliberate configuration.
-3. Add embeddings/hybrid search, platform connectors, hosted/local model providers, and
+3. Keep the Phase 7 provider adapters opt-in: mock, OpenAI-compatible, and Ollama model-provider
+   boundaries are implemented for explicit in-process harnesses, but there is still no public
+   `dev`/`serve` toggle, package discovery, or automatic provider startup.
+4. Add embeddings/hybrid search, platform connectors, public provider enablement, and
    Postgres/pgvector deployment profiles as separately installable or enableable modules.
-4. Keep core startup, migration, capture, and FTS search healthy when no optional modules are
+5. Keep core startup, migration, capture, and FTS search healthy when no optional modules are
    installed.
 
 ## Capability registry
@@ -302,7 +308,7 @@ from idea_inbox.capabilities.registry import CapabilityRegistry
 from idea_inbox.core.capabilities import Capability, CapabilityKind, ConfigRequirement
 
 provider = Capability(
-    name="openai-compatible-provider",
+    name="openai-compatible-model-provider",
     kind=CapabilityKind.PROVIDER,
     dependencies=("core",),
     default_enabled=False,
@@ -314,12 +320,12 @@ provider = Capability(
             description="OpenAI-compatible credential handle.",
         ),
     ),
-    description="Planned OpenAI-compatible model provider.",
+    description="OpenAI-compatible model-provider boundary.",
     owner="example-provider-package",
 )
 
 registry = CapabilityRegistry(installed_capabilities=(provider,))
-record = registry.get_capability("openai-compatible-provider")
+record = registry.get_capability("openai-compatible-model-provider")
 ```
 
 ## CLI usage
@@ -361,7 +367,7 @@ print the local API URL, and then serve requests until stopped by the operator.
 
 | Command | Purpose | Current behavior |
 | --- | --- | --- |
-| `uv run idea-inbox dev [--host 127.0.0.1] [--port 8080] [--database ./data/idea-inbox.sqlite3]` | Start the local development API using SQLite and mock/local providers by default. | Applies SQLite migrations, serves `/v1/ideas`, `/v1/ideas/search`, and default-disabled `/v1/query`, and exits when stopped. |
+| `uv run idea-inbox dev [--host 127.0.0.1] [--port 8080] [--database ./data/idea-inbox.sqlite3]` | Start the local development API using SQLite with optional providers disabled by default. | Applies SQLite migrations, serves `/v1/ideas`, `/v1/ideas/search`, and default-disabled `/v1/query`, and exits when stopped. |
 | `uv run idea-inbox migrate [--database ./data/idea-inbox.sqlite3]` | Apply deterministic SQLite storage migrations, including the FTS5 projection. | Applies migrations and exits `0`; exits `1` with an actionable error if configuration is invalid, SQLite FTS5 is unavailable, or a migration fails. |
 | `uv run idea-inbox serve [--host 127.0.0.1] [--port 8080] [--database ./data/idea-inbox.sqlite3]` | Start the configured `/v1` API for local or self-hosted use. | Applies SQLite migrations, serves `/v1/ideas`, `/v1/ideas/search`, and default-disabled `/v1/query`, and exits when stopped. |
 

@@ -17,11 +17,11 @@ uv run idea-inbox migrate
 uv run idea-inbox dev --host 127.0.0.1 --port 8080
 ```
 
-Local/mock mode is the privacy-preserving default for development: it must not require
-hosted-model credentials, hidden outbound model calls, connector tokens, vector databases, or
-telemetry. The v0.2.0 cited-query foundation is present but remains disabled by default for normal
-`dev` and `serve` runs; hosted/local model providers and richer query modules are optional later
-work rather than requirements for local development.
+The privacy-preserving default development path must not require hosted-model credentials, hidden
+outbound model calls, local model daemons, connector tokens, vector databases, or telemetry. The
+v0.2.0 cited-query foundation and Phase 7 provider-adapter boundaries are present, but query and
+provider capabilities remain disabled by default for normal `dev` and `serve` runs. Provider-backed
+query is currently limited to explicit in-process tests or embedded harnesses.
 
 The WSGI API app is available as `idea_inbox.api.create_app`, and the CLI server wrapper starts
 it after applying pending SQLite migrations. It currently exposes:
@@ -31,9 +31,10 @@ it after applying pending SQLite migrations. It currently exposes:
 - `GET /v1/ideas/search?q=...&limit=10` for SQLite FTS-backed search over stored ideas.
 - `POST /v1/query` for cited answers when the optional `query-ai` capability is enabled.
   The public `dev`/`serve` path uses the default registry, so `query-ai` is disabled and the route
-  returns `503 CAPABILITY_DISABLED` without retrieval or provider work. Embedded deterministic/mock
-  harnesses can enable it by supplying an enabled `CapabilityRegistry` to `create_app(...)`; no
-  hosted model credentials or provider SDKs are required for those smoke tests.
+  returns `503 CAPABILITY_DISABLED` without request validation, retrieval, provider startup, or
+  outbound network work. Embedded deterministic/mock harnesses can enable it by supplying provider
+  capability metadata, explicit enabled overrides, and an injected model provider to
+  `create_app(...)`; no hosted model credentials or provider SDKs are required for those smoke tests.
 
 `dev` is the local development entrypoint. `serve` exposes the same API with explicit host/port
 options for local or self-hosted use. Production packaging still needs a Dockerfile, Compose file,
@@ -58,11 +59,13 @@ If `IDEA_INBOX_DATABASE_URL` and `IDEA_INBOX_SQLITE_PATH` are both set, configur
 fails before migrations run. The MVP backend rejects non-SQLite URLs such as Postgres until a
 separate Postgres storage adapter is implemented.
 
-The current runtime also loads `IDEA_INBOX_ENV` and `IDEA_INBOX_LOG_LEVEL`. Provider, connector,
-and API-token-looking keys in `.env.example` are reserved for planned work and are not enforced by
-today's WSGI API. In particular, setting `IDEA_INBOX_API_KEY` does not protect `POST /v1/ideas`
-yet; bind to `127.0.0.1` or add your own reverse proxy, network ACL, or access-control layer
-before exposing `dev` or `serve` beyond the local host.
+The current runtime also loads `IDEA_INBOX_ENV` and `IDEA_INBOX_LOG_LEVEL`. Provider keys in
+`.env.example` describe the Phase 7 opt-in adapter surface, but they do not change normal
+`dev`/`serve` startup because those commands do not install or enable provider capabilities. The
+connector and API-token-looking keys remain planned no-ops. In particular, setting
+`IDEA_INBOX_API_KEY` does not protect `POST /v1/ideas` yet; bind to `127.0.0.1` or add your own
+reverse proxy, network ACL, or access-control layer before exposing `dev` or `serve` beyond the
+local host.
 
 ## Current SQLite migrations and search index
 
@@ -141,13 +144,19 @@ Current enable/disable surface:
 - Disable: use the default `CapabilityRegistry()`, omit a `query-ai` override, or explicitly pass
   `enabled_overrides={"query-ai": False}` in an embedded/test harness. This is what `dev` and
   `serve` do today.
-- Enable for deterministic local tests only: construct the WSGI app with a `CapabilityRegistry`
-  that installs a mock `model-provider`, sets `enabled_overrides={"query-ai": True}`, and provides
-  `config_values={"IDEA_INBOX_CHAT_PROVIDER": "mock"}`. The canonical example is
+- Enable for deterministic local tests only: construct the WSGI app with provider metadata from
+  `idea_inbox.providers.capabilities.provider_capabilities()`, set `enabled_overrides` for
+  `query-ai`, `model-provider`, `mock-model-provider`, and `none-credentials`, provide
+  `config_values={"IDEA_INBOX_CHAT_PROVIDER": "mock"}`, and inject a `MockModelProvider` if you
+  want the model-provider boundary exercised explicitly. The canonical example is
   `tests/test_api_query.py::deterministic_query_registry`.
-- Not implemented yet: a CLI flag, `.env` toggle, provider package discovery, real hosted/local
-  model adapters, streaming, embeddings, hybrid search, public query UI, or production auth. Setting
-  `IDEA_INBOX_CHAT_PROVIDER=mock` in `.env` alone does not enable query for the packaged server.
+- Implemented but still harness-only: OpenAI-compatible and Ollama provider adapters can map stored
+  evidence to `/chat/completions` and `/api/generate` request payloads with fakeable HTTP boundaries.
+  Normal tests fake those boundaries and do not call hosted APIs or an Ollama daemon.
+- Not implemented yet: a CLI flag, `.env` toggle, provider package discovery, automatic provider
+  construction from environment, streaming, embeddings/vector or hybrid search, public query UI, or
+  production auth. Setting `IDEA_INBOX_CHAT_PROVIDER=mock` in `.env` alone does not enable query for
+  the packaged server.
 
 When enabled by a harness, query only answers from stored ideas in the configured SQLite database.
 It is not general web search, does not ingest connector data, does not read raw event payload bodies
@@ -172,10 +181,10 @@ removes the raw-event trail, drafts, ideas, tags, and search projection together
 ## Planned lightweight self-hosting
 
 The intended lightweight self-host path is the current SQLite-backed WSGI API packaged for a
-single host. Optional modules can add richer AI-assisted query, real model providers, connectors, embeddings,
-or deployment profiles, but the base self-host path should remain capture + SQLite search with
-default-disabled query and no mandatory AI. A Docker image may become the convenient packaging format once the
-repository includes a Dockerfile and a published image exists.
+single host. Optional modules can add public provider enablement, richer AI-assisted query,
+connectors, embeddings, or deployment profiles, but the base self-host path should remain capture +
+SQLite search with default-disabled query and no mandatory AI. A Docker image may become the
+convenient packaging format once the repository includes a Dockerfile and a published image exists.
 
 ## Planned production self-hosting
 

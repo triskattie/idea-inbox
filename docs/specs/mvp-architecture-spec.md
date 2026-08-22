@@ -17,6 +17,7 @@ This spec consolidates the repository discovery in
 - [`sqlite-schema-plan.md`](sqlite-schema-plan.md)
 - [`capability-registry-spec.md`](capability-registry-spec.md)
 - [`cited-query-api-contract.md`](cited-query-api-contract.md)
+- [`phase-7-provider-adapters-brief.md`](phase-7-provider-adapters-brief.md)
 - [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md)
 - [`../decisions/ADR-001-connector-and-provider-boundaries.md`](../decisions/ADR-001-connector-and-provider-boundaries.md)
 - [`../decisions/ADR-002-sqlite-default-postgres-production.md`](../decisions/ADR-002-sqlite-default-postgres-production.md)
@@ -142,10 +143,11 @@ parses `dev`, `migrate`, and `serve`; `idea-inbox migrate` applies deterministic
 migrations for the configured database or an explicit `--database` path; and `idea-inbox dev` /
 `idea-inbox serve` start the WSGI API after applying pending migrations.
 
-Current configuration loading is intentionally narrower than the full planned MVP surface: only
-`IDEA_INBOX_ENV`, `IDEA_INBOX_LOG_LEVEL`, `IDEA_INBOX_DATABASE_URL`, and
-`IDEA_INBOX_SQLITE_PATH` are implemented. Provider, connector, and API-token keys in
-`.env.example` are reserved/no-op until their adapters and access gates land; setting
+Current `dev`/`serve` startup remains intentionally narrower than the full planned MVP surface:
+base app startup only needs `IDEA_INBOX_ENV`, `IDEA_INBOX_LOG_LEVEL`, `IDEA_INBOX_DATABASE_URL`, and
+`IDEA_INBOX_SQLITE_PATH`. Provider keys in `.env.example` are now tied to Phase 7 opt-in
+capability metadata and provider-adapter boundaries, but normal CLI startup does not install or
+enable provider capabilities. Connector and API-token keys remain reserved/no-op; setting
 `IDEA_INBOX_API_KEY` does not protect `POST /v1/ideas` in the current runtime.
 
 User-facing docs distinguish the smoke command (`uv run idea-inbox`), the runnable migration
@@ -639,7 +641,8 @@ Assumptions:
 - The operator controls the deployment and storage location.
 - Local SQLite files and Postgres data directories are sensitive user data.
 - Connector payloads may contain private chat/email content.
-- Model providers may receive retrieved idea text unless a local/mock provider is configured.
+- Model providers may receive retrieved idea text when provider-backed query is deliberately
+  enabled; local/mock providers can keep that path offline for tests and private harnesses.
 - Hosted model use is optional and must be visible in configuration.
 
 Target requirements:
@@ -670,7 +673,8 @@ idea-inbox migrate
 idea-inbox serve --host 127.0.0.1 --port 8080
 ```
 
-`dev` should run the local API with SQLite and mock/local providers by default. It should fail with actionable messages when required configuration is missing.
+`dev` should run the local API with SQLite and provider capabilities disabled by default. It should
+fail with actionable messages when required base configuration is missing.
 
 These are target MVP commands. Phase 1 implements command parsing before the API, storage, and server runtimes exist. Documentation that describes current setup should continue to use the existing smoke command and explicitly label `dev`, `migrate`, and `serve` as startup targets until their underlying runtime modules are implemented.
 
@@ -692,7 +696,7 @@ Common behavior:
 
 `idea-inbox dev`
 
-- Purpose: start the local development API using SQLite and mock/local providers by default.
+- Purpose: start the local development API using SQLite with optional providers disabled by default.
 - Options: `--host` and `--port` may override the default bind address and port; database URL
   and log level are read from the same configuration surface used by the server.
 - Behavior: loads development configuration, ensures the SQLite database is ready, starts the
@@ -738,10 +742,12 @@ Configuration should cover:
 - Embedding provider type, model name, and credential provider reference.
 - Telegram, Discord, email, and webhook credentials/settings when those connectors are enabled.
 
-Current implementation status: `src/idea_inbox/config.py` implements only environment, log level,
-and SQLite database location settings. The API/manual access token, provider selectors, OpenAI
-compatible settings, and Telegram/Discord/email connector settings are reserved in `.env.example`
-but are no-ops until their runtime gates/adapters are implemented.
+Current implementation status: `src/idea_inbox/config.py` implements environment, log level, and
+SQLite database location settings for base startup. Phase 7 adds provider selectors and
+OpenAI-compatible/Ollama settings as opt-in capability configuration read by explicit in-process
+registries; those keys remain inert for normal `dev`/`serve` because no provider capabilities are
+installed or enabled there. The API/manual access token and Telegram/Discord/email connector
+settings are still reserved no-ops until their runtime gates/adapters are implemented.
 
 ## MVP implementation phases
 
@@ -806,6 +812,10 @@ Acceptance criteria:
   capture/search path.
 
 ### Phase 7: Optional provider adapters
+
+Status: Implemented as an opt-in provider-adapter boundary for explicit harnesses. It does not add
+public CLI/`.env` enablement, package discovery, automatic provider construction, streaming,
+embeddings/vector search, or default hosted/local model calls.
 
 Acceptance criteria:
 

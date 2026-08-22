@@ -49,15 +49,21 @@ ideas before presenting citations.
 `query-ai` disabled, so base startup, migration, capture, and FTS search do not require a model
 provider and the query route returns `CAPABILITY_DISABLED` before retrieval.
 
-When a test or embedded harness supplies an enabled registry with a deterministic mock
-`model-provider`, the query path validates the request, retrieves hits from SQLite FTS, resolves
-those hits through authoritative storage, and builds citations from persisted `Idea` records. The
-answerer may return only stored-idea claims backed by citations, or the explicit
+When a test or embedded harness supplies provider capability metadata, explicit enabled overrides,
+and a selected model provider, the query path validates the request, retrieves hits from SQLite FTS,
+resolves those hits through authoritative storage, and builds citations from persisted `Idea`
+records. The answerer may return only stored-idea claims backed by citations, or the explicit
 `no_relevant_stored_ideas` response when no evidence resolves.
 
-This foundation intentionally excludes general web search, connector ingestion, embeddings or
-hybrid search, real provider adapters, UI, production auth, multi-user ownership, and public
-exposure.
+Phase 7 implements SDK-free provider-adapter boundaries under `idea_inbox.providers`: deterministic
+mock providers, an OpenAI-compatible `/chat/completions` request mapper, and an Ollama `/api/generate`
+request mapper. These adapters remain outside core, receive only citation-safe stored-idea evidence,
+and use credential-provider contracts instead of direct secret reads in core query code.
+
+The packaged `dev`/`serve` path still does not install provider capabilities, auto-build providers
+from `.env`, start local model daemons, call hosted APIs, run embeddings/vector ranking, expose a
+public query UI, implement production auth, or add multi-user ownership. General web search and
+connector ingestion remain outside the current cited-query path.
 
 ## Design priorities
 
