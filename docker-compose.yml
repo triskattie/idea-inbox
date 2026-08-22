@@ -1,0 +1,29 @@
+# Optional Postgres + pgvector deployment profile for Idea Inbox.
+#
+# Start it with:
+#   docker compose --profile postgres up -d
+#
+# Then point Idea Inbox at it:
+#   IDEA_INBOX_DATABASE_URL=postgresql://idea_inbox:idea_inbox@127.0.0.1:5434/idea_inbox
+#
+# SQLite remains the default dev path; nothing here is required for normal runs.
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: idea_inbox
+      POSTGRES_PASSWORD: idea_inbox
+      POSTGRES_DB: idea_inbox
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - idea-inbox-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U idea_inbox -d idea_inbox"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  idea-inbox-pgdata:

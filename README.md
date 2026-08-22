@@ -45,8 +45,10 @@ model providers, but no public CLI toggle or package discovery path enables them
 `dev`/`serve` runs yet. Phase 8 adds optional fixture-driven connector adapters — generic webhook,
 Telegram, email, Discord — behind the SDK-free `Connector` protocol; only the generic webhook has
 an HTTP route (`POST /v1/connectors/webhook/generic`), and it stays disabled until the built-in
-`generic-webhook-connector` capability is enabled through an injected registry. Vector search and
-optional Postgres + pgvector deployment profiles remain later opt-in modules. See
+`generic-webhook-connector` capability is enabled through an injected registry. An optional
+Postgres + pgvector deployment profile (`docker compose --profile postgres`, `.[postgres]` extra)
+implements the same storage/search/query contracts as SQLite; see the self-hosting docs. Vector
+search itself remains a later opt-in module. See
 [ADR-007](docs/decisions/ADR-007-optional-capability-modules.md).
 
 ## Development status

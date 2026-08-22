@@ -56,8 +56,25 @@ Use one database location setting at a time:
 - `IDEA_INBOX_SQLITE_PATH=./data/idea-inbox.sqlite3` for a plain path.
 
 If `IDEA_INBOX_DATABASE_URL` and `IDEA_INBOX_SQLITE_PATH` are both set, configuration loading
-fails before migrations run. The MVP backend rejects non-SQLite URLs such as Postgres until a
-separate Postgres storage adapter is implemented.
+fails before migrations run.
+
+## Optional Postgres + pgvector profile
+
+SQLite stays the default dev path. An optional Postgres profile exists for self-hosters who want
+a server database (and the pgvector extension for a future embeddings phase):
+
+1. Start the database: `docker compose --profile postgres up -d` (uses the `pgvector/pgvector:pg16`
+   image, bound to `127.0.0.1:5434`).
+2. Install the optional driver: `pip install -e '.[postgres]'` (or
+   `uv sync --extra postgres`).
+3. Point Idea Inbox at it: `IDEA_INBOX_DATABASE_URL=postgresql://idea_inbox:idea_inbox@127.0.0.1:5434/idea_inbox`.
+
+`idea-inbox migrate` applies the same deterministic migration model to Postgres
+(`src/idea_inbox/storage/postgres_migrations/`). The `PostgresStorageBackend` and
+`PostgresFTSSearchIndex` implement the same service contracts as the SQLite backend, so manual
+capture, connector ingestion, keyword search, and cited query behave identically. Postgres
+integration tests are opt-in and never run in the normal suite; see
+`tests/test_postgres_integration.py` for the exact command.
 
 The current runtime also loads `IDEA_INBOX_ENV` and `IDEA_INBOX_LOG_LEVEL`. Provider keys in
 `.env.example` describe the Phase 7 opt-in adapter surface, but they do not change normal

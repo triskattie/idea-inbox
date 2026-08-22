@@ -9,6 +9,8 @@ DEFAULT_ENVIRONMENT = "development"
 DEFAULT_LOG_LEVEL = "INFO"
 DEFAULT_DATABASE_URL = "sqlite:///./data/idea-inbox.sqlite3"
 
+POSTGRES_URL_PREFIXES = ("postgresql://", "postgres://", "postgresql+psycopg://")
+
 DATABASE_URL_ENV = "IDEA_INBOX_DATABASE_URL"
 SQLITE_PATH_ENV = "IDEA_INBOX_SQLITE_PATH"
 ENVIRONMENT_ENV = "IDEA_INBOX_ENV"
@@ -27,6 +29,18 @@ class AppConfig:
     log_level: str
     database_url: str
     database_path: Path
+
+    @property
+    def is_postgres(self) -> bool:
+        return self.database_url.startswith(POSTGRES_URL_PREFIXES)
+
+    @property
+    def database_dsn(self) -> str:
+        """Normalized connection DSN for the selected backend."""
+        if not self.is_postgres:
+            return self.database_url
+        scheme, _, rest = self.database_url.partition("://")
+        return f"postgresql://{rest}" if scheme != "postgresql" else self.database_url
 
 
 def load_config(
@@ -49,7 +63,11 @@ def load_config(
         database_url = _database_url_for_path(database_path)
     else:
         database_url = database_url or DEFAULT_DATABASE_URL
-        database_path = _sqlite_path_from_url(database_url, root)
+        if database_url.startswith(POSTGRES_URL_PREFIXES):
+            database_path = Path(":memory:")
+            _validate_postgres_dsn(database_url)
+        else:
+            database_path = _sqlite_path_from_url(database_url, root)
 
     return AppConfig(
         environment=values.get(ENVIRONMENT_ENV, DEFAULT_ENVIRONMENT).strip() or DEFAULT_ENVIRONMENT,
@@ -57,6 +75,16 @@ def load_config(
         database_url=database_url,
         database_path=database_path,
     )
+
+
+def _validate_postgres_dsn(database_url: str) -> None:
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(database_url)
+    if not parts.hostname or not parts.path.strip("/"):
+        raise ConfigError(
+            f"{DATABASE_URL_ENV} Postgres URLs must include a host and database name."
+        )
 
 
 def _sqlite_path_from_url(database_url: str, project_root: Path) -> Path:

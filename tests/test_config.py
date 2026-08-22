@@ -55,14 +55,16 @@ def test_load_config_accepts_configured_sqlite_path(
     assert config.database_path == configured_path
 
 
-def test_load_config_rejects_unsupported_database_backend(
+def test_load_config_accepts_postgres_backend_as_optional_profile(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("IDEA_INBOX_DATABASE_URL", "postgresql://localhost/idea_inbox")
+    monkeypatch.setenv("IDEA_INBOX_DATABASE_URL", "postgresql://localhost:5432/idea_inbox")
     monkeypatch.delenv("IDEA_INBOX_SQLITE_PATH", raising=False)
 
-    with pytest.raises(ConfigError, match="IDEA_INBOX_DATABASE_URL must start with sqlite:///"):
-        load_config(project_root=tmp_path)
+    config = load_config(project_root=tmp_path)
+
+    assert config.is_postgres is True
+    assert config.database_dsn == "postgresql://localhost:5432/idea_inbox"
 
 
 def test_load_config_rejects_conflicting_database_location_settings(
