@@ -49,6 +49,37 @@ def test_manual_connector_ingests_raw_event_draft_and_idea(storage: SQLiteStorag
     assert idea.tags == ("capture",)
 
 
+def test_manual_connector_replay_is_idempotent_by_dedupe_key(
+    storage: SQLiteStorageBackend,
+) -> None:
+    connector = ManualConnector()
+    payload = {
+        "text": "Original manual idea body.",
+        "idempotency_key": "manual-idem-77",
+        "source_ref": "manual-note-77",
+        "actor_ref": "operator-2",
+        "metadata": {"surface": "manual-adapter-replay"},
+        "tags": ["Capture"],
+    }
+
+    first = ingest_connector_event(storage, connector, payload)
+    duplicate = ingest_connector_event(
+        storage, connector, {**payload, "text": "Retried manual body."}
+    )
+
+    assert first.duplicate is False
+    assert duplicate.duplicate is True
+    assert duplicate.raw_event.id == first.raw_event.id
+    assert duplicate.drafts[0].id == first.drafts[0].id
+    assert duplicate.ideas[0].id == first.ideas[0].id
+    assert duplicate.ideas[0].text == "Original manual idea body."
+    assert duplicate.raw_event.provider_event_id == "manual-note-77"
+    assert duplicate.raw_event.dedupe_key == "manual-idem-77"
+    assert storage.count_raw_events() == 1
+    assert storage.list_idea_drafts(raw_event_id=first.raw_event.id) == list(first.drafts)
+    assert [idea.id for idea in storage.list_ideas()] == [first.ideas[0].id]
+
+
 def test_webhook_connector_preserves_provider_id_verbatim_for_idempotency(
     storage: SQLiteStorageBackend,
 ) -> None:
