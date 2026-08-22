@@ -67,6 +67,24 @@ connector and API-token-looking keys remain planned no-ops. In particular, setti
 reverse proxy, network ACL, or access-control layer before exposing `dev` or `serve` beyond the
 local host.
 
+## Optional connectors
+
+Phase 8 connector adapters are offline fixture parsers plus one capability-gated HTTP route. None
+of them are enabled by default, and none of them poll platforms or read connector credentials.
+
+- Generic webhook: `POST /v1/connectors/webhook/generic` returns `503 CAPABILITY_DISABLED` until
+  the built-in `generic-webhook-connector` capability is enabled. There is no env flag for this
+  yet; enablement happens through an injected `CapabilityRegistry`, for example
+  `create_app(database_path=..., capability_registry=CapabilityRegistry(enabled_overrides={"generic-webhook-connector": True}))`.
+  Accepted bodies are JSON objects with required non-empty `text` and optional `event_id`
+  (preserved verbatim as the idempotency key), `source_ref`, `actor_ref`, `occurred_at`,
+  `metadata`, and `tags`.
+- Telegram, email, and Discord adapters (`idea_inbox.connectors.telegram.TelegramConnector`,
+  `idea_inbox.connectors.email.EmailConnector`,
+  `idea_inbox.connectors.discord.DiscordConnector`) parse payloads/fixtures in-process only;
+  there are no polling runtimes, bot tokens, or IMAP connections yet, and their `.env.example`
+  keys stay reserved no-ops.
+
 ## Current SQLite migrations and search index
 
 SQLite is the current runnable persistence path. Apply migrations with:

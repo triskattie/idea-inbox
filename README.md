@@ -37,23 +37,27 @@ or test harness deliberately supplies an enabled capability registry. The implem
 uses deterministic SQLite FTS retrieval plus a local/mock answerer; it does not require real model
 credentials and does not make hosted-model calls.
 
-This release is intentionally narrow: it is not general web search, connector ingestion,
-embeddings, hybrid/vector search, a browser/mobile UI, production auth/multi-user ownership, or a
-public internet service. Assume localhost or a private network such as Tailscale unless you add your
-own access control. Phase 7 adds opt-in provider-adapter boundaries for mock, OpenAI-compatible,
-and Ollama-style model providers, but no public CLI toggle or package discovery path enables them
-in normal `dev`/`serve` runs yet. Telegram/email/Discord connectors, vector search, and optional
-Postgres + pgvector deployment profiles remain later opt-in modules. See
+This release is intentionally narrow: it is not general web search, embeddings, hybrid/vector
+search, a browser/mobile UI, production auth/multi-user ownership, or a public internet service.
+Assume localhost or a private network such as Tailscale unless you add your own access control.
+Phase 7 adds opt-in provider-adapter boundaries for mock, OpenAI-compatible, and Ollama-style
+model providers, but no public CLI toggle or package discovery path enables them in normal
+`dev`/`serve` runs yet. Phase 8 adds optional fixture-driven connector adapters — generic webhook,
+Telegram, email, Discord — behind the SDK-free `Connector` protocol; only the generic webhook has
+an HTTP route (`POST /v1/connectors/webhook/generic`), and it stays disabled until the built-in
+`generic-webhook-connector` capability is enabled through an injected registry. Vector search and
+optional Postgres + pgvector deployment profiles remain later opt-in modules. See
 [ADR-007](docs/decisions/ADR-007-optional-capability-modules.md).
 
 ## Development status
 
 This repository now has a runnable local SQLite path, deterministic migrations, an importable
-WSGI API for manual capture, FTS-backed search, and default-disabled cited query, plus `dev`/`serve`
-commands that start the local API after applying pending migrations. Provider adapter boundaries are
-implemented for explicit in-process harnesses, while external connectors, public provider
-enablement, embeddings/hybrid search, UI, production auth, and packaged deployment assets are still
-planned. See:
+WSGI API for manual capture, FTS-backed search, default-disabled cited query, provider-adapter
+boundaries for explicit in-process harnesses, and offline connector adapters (manual, generic
+webhook with a capability-gated route, Telegram/email/Discord fixture parsers), plus `dev`/`serve`
+commands that start the local API after applying pending migrations. Connector polling/webhook
+runtimes, public provider enablement, embeddings/hybrid search, UI, production auth, and packaged
+deployment assets are still planned. See:
 
 - [Development standards](CONTRIBUTING.md)
 - [Architecture overview](docs/architecture.md)
