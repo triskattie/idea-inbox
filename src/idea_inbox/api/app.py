@@ -18,6 +18,7 @@ from idea_inbox.core.manual_capture import (
     validate_manual_idea_payload,
 )
 from idea_inbox.core.models import EmptySearchQuery, SearchLimitError
+from idea_inbox.core.ports import ModelProvider
 from idea_inbox.core.query import (
     QueryValidationError,
     answer_query,
@@ -38,6 +39,7 @@ def create_app(
     *,
     database_path: str | Path | None = None,
     capability_registry: CapabilityRegistry | None = None,
+    model_provider: ModelProvider | None = None,
 ) -> WSGIApp:
     """Create a small WSGI app backed by the configured SQLite database."""
     if config is not None and database_path is not None:
@@ -62,6 +64,7 @@ def create_app(
                 environ,
                 resolved_database_path,
                 resolved_capability_registry,
+                model_provider,
             )
 
         if method != "GET" or path != "/v1/ideas/search":
@@ -145,6 +148,7 @@ def _query_response(
     environ: dict[str, Any],
     database_path: str | Path,
     capability_registry: CapabilityRegistry,
+    model_provider: ModelProvider | None,
 ) -> list[bytes]:
     capability = capability_registry.get_capability("query-ai")
     if capability is None or capability.status != CapabilityStatus.ENABLED:
@@ -165,7 +169,7 @@ def _query_response(
 
     try:
         request = validate_query_request(_read_json_body(environ))
-        payload = _query_payload(database_path, request)
+        payload = _query_payload(database_path, request, model_provider)
     except ManualIdeaValidationError as exc:
         return _json_response(
             start_response,
@@ -198,7 +202,9 @@ def _query_response(
     return _json_response(start_response, "200 OK", payload)
 
 
-def _query_payload(database_path: str | Path, request: Any) -> dict[str, Any]:
+def _query_payload(
+    database_path: str | Path, request: Any, model_provider: ModelProvider | None
+) -> dict[str, Any]:
     storage = SQLiteStorageBackend(database_path)
     try:
         storage.migrate()
@@ -206,6 +212,7 @@ def _query_payload(database_path: str | Path, request: Any) -> dict[str, Any]:
             storage=storage,
             search_index=SQLiteFTSSearchIndex(storage),
             request=request,
+            answerer=model_provider,
         )
     finally:
         storage.close()

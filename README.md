@@ -38,19 +38,22 @@ uses deterministic SQLite FTS retrieval plus a local/mock answerer; it does not 
 credentials and does not make hosted-model calls.
 
 This release is intentionally narrow: it is not general web search, connector ingestion,
-embeddings, hybrid/vector search, a full provider ecosystem, a browser/mobile UI, production
-auth/multi-user ownership, or a public internet service. Assume localhost or a private network such
-as Tailscale unless you add your own access control. Provider interfaces, Telegram/email/Discord
-connectors, embeddings, and optional Postgres + pgvector deployment profiles remain later opt-in
-modules. See [ADR-007](docs/decisions/ADR-007-optional-capability-modules.md).
+embeddings, hybrid/vector search, a browser/mobile UI, production auth/multi-user ownership, or a
+public internet service. Assume localhost or a private network such as Tailscale unless you add your
+own access control. Phase 7 adds opt-in provider-adapter boundaries for mock, OpenAI-compatible,
+and Ollama-style model providers, but no public CLI toggle or package discovery path enables them
+in normal `dev`/`serve` runs yet. Telegram/email/Discord connectors, vector search, and optional
+Postgres + pgvector deployment profiles remain later opt-in modules. See
+[ADR-007](docs/decisions/ADR-007-optional-capability-modules.md).
 
 ## Development status
 
 This repository now has a runnable local SQLite path, deterministic migrations, an importable
 WSGI API for manual capture, FTS-backed search, and default-disabled cited query, plus `dev`/`serve`
-commands that start the local API after applying pending migrations. External connectors, real
-provider-backed answer generation, embeddings/hybrid search, UI, production auth, and packaged
-deployment assets are still planned. See:
+commands that start the local API after applying pending migrations. Provider adapter boundaries are
+implemented for explicit in-process harnesses, while external connectors, public provider
+enablement, embeddings/hybrid search, UI, production auth, and packaged deployment assets are still
+planned. See:
 
 - [Development standards](CONTRIBUTING.md)
 - [Architecture overview](docs/architecture.md)

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
 from idea_inbox.core.models import Idea, SearchHit, SearchLimitError
-from idea_inbox.core.ports import Answerer, SearchIndex, StorageBackend
+from idea_inbox.core.ports import Answerer, ModelProviderOptions, SearchIndex, StorageBackend
 
 NO_EVIDENCE_MESSAGE = "I could not find relevant stored ideas for that query."
 DETERMINISTIC_ANSWER_MODE = "deterministic_mock"
@@ -106,7 +107,13 @@ class DeterministicMockAnswerer:
     mode = DETERMINISTIC_ANSWER_MODE
     provider_name = "mock"
 
-    def answer(self, evidence: list[AnswerEvidence]) -> QueryAnswer:
+    def answer(
+        self,
+        *,
+        query: str,
+        evidence: Sequence[AnswerEvidence],
+        options: ModelProviderOptions | None = None,
+    ) -> QueryAnswer:
         if not evidence:
             return QueryAnswer(message=NO_EVIDENCE_MESSAGE, grounding="no_relevant_stored_ideas")
         first = evidence[0]
@@ -160,7 +167,7 @@ def answer_query(
     answerer = answerer or DeterministicMockAnswerer()
     hits = _search_with_salient_fallback(search_index, request)
     evidence = _resolve_evidence(storage, hits, request.query)
-    answer = answerer.answer(evidence)
+    answer = answerer.answer(query=request.query, evidence=evidence)
     grounding = answer.grounding
     citations = _citations(evidence) if grounding == "stored_ideas" else []
     visible_hits = _hits(evidence) if request.include_hits and evidence else []

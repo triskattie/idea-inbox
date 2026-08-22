@@ -1,7 +1,8 @@
-"""SDK-free core protocols for storage and search adapters."""
+"""SDK-free core protocols for storage, search, and provider adapters."""
 
 from collections.abc import Iterator, Sequence
 from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 from idea_inbox.core.models import Idea, IdeaDraft, RawEvent, SearchHit
@@ -40,7 +41,55 @@ class Answerer(Protocol):
     mode: str
     provider_name: str | None
 
-    def answer(self, evidence: Sequence[AnswerEvidence]) -> QueryAnswer: ...
+    def answer(
+        self,
+        *,
+        query: str,
+        evidence: Sequence[Any],
+        options: "ModelProviderOptions | None" = None,
+    ) -> Any: ...
+
+
+@dataclass(frozen=True)
+class ModelProviderOptions:
+    """Provider-neutral generation options for retrieval-grounded answers."""
+
+    temperature: float | None = None
+    max_output_tokens: int | None = None
+
+
+@dataclass(frozen=True)
+class CredentialRequest:
+    """SDK-free credential lookup request owned by provider adapters."""
+
+    handle: str
+    source: str
+
+
+@dataclass(frozen=True)
+class CredentialMaterial:
+    """Resolved request auth data without provider SDK credential objects."""
+
+    value: str
+    scheme: str = "bearer"
+    secret: bool = True
+
+
+class CredentialProvider(Protocol):
+    """Resolve credentials for model or embedding providers without SDK leakage."""
+
+    def resolve(self, request: CredentialRequest) -> CredentialMaterial | None: ...
+
+
+class EmbeddingProvider(Protocol):
+    """Future embedding provider contract; vector search is not enabled by this shape."""
+
+    provider_name: str
+
+    def embed_texts(self, texts: Sequence[str]) -> list[list[float]]: ...
+
+
+ModelProvider = Answerer
 
 
 class StorageBackend(Protocol):

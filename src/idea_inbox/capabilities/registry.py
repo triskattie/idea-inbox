@@ -1,7 +1,7 @@
 """Capability registry validation orchestration."""
 
 import os
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import replace
 
 from idea_inbox.config import DATABASE_URL_ENV, SQLITE_PATH_ENV, ConfigError, load_config
@@ -17,6 +17,12 @@ from idea_inbox.core.capabilities import (
 )
 
 CapabilityMap = dict[str, tuple[Capability, CapabilityOrigin]]
+
+QUERY_PROVIDER_SELECTIONS = {
+    "mock": "mock-model-provider",
+    "openai-compatible": "openai-compatible-model-provider",
+    "ollama": "ollama-model-provider",
+}
 
 
 def builtin_capabilities() -> tuple[Capability, ...]:
@@ -192,6 +198,13 @@ class CapabilityRegistry:
 
                 diagnostics.extend(_configuration_diagnostics(capability, self._config_values))
                 diagnostics.extend(
+                    _query_provider_selection_diagnostics(
+                        capability,
+                        self._config_values,
+                        evaluate,
+                    )
+                )
+                diagnostics.extend(
                     _builtin_configuration_diagnostics(capability, self._config_values)
                 )
                 status = CapabilityStatus.MISCONFIGURED if diagnostics else CapabilityStatus.ENABLED
@@ -258,6 +271,54 @@ def _configuration_diagnostics(
             }
         )
     return diagnostics
+
+
+def _query_provider_selection_diagnostics(
+    capability: Capability,
+    config_values: Mapping[str, str],
+    evaluate: Callable[[str], CapabilityRecord],
+) -> list[dict[str, str]]:
+    if capability.name != "query-ai":
+        return []
+    selected = config_values.get("IDEA_INBOX_CHAT_PROVIDER", "").strip()
+    if not selected:
+        return []
+    selected_capability = QUERY_PROVIDER_SELECTIONS.get(selected)
+    if selected_capability is None:
+        return [
+            {
+                "code": "unknown_provider_selection",
+                "field": "IDEA_INBOX_CHAT_PROVIDER",
+                "message": f"Selected chat provider {selected} has no known capability mapping.",
+            }
+        ]
+
+    record = evaluate(selected_capability)
+    if record.origin == CapabilityOrigin.UNAVAILABLE:
+        return [
+            {
+                "code": "dependency_unavailable",
+                "field": selected_capability,
+                "message": f"Selected provider capability {selected_capability} is unavailable.",
+            }
+        ]
+    if record.status == CapabilityStatus.DISABLED:
+        return [
+            {
+                "code": "dependency_disabled",
+                "field": selected_capability,
+                "message": f"Selected provider capability {selected_capability} is disabled.",
+            }
+        ]
+    if record.status == CapabilityStatus.MISCONFIGURED:
+        return [
+            {
+                "code": "dependency_misconfigured",
+                "field": selected_capability,
+                "message": f"Selected provider capability {selected_capability} is misconfigured.",
+            }
+        ]
+    return []
 
 
 def _builtin_configuration_diagnostics(

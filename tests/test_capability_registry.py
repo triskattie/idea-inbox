@@ -7,6 +7,7 @@ from idea_inbox.core.capabilities import (
     CapabilityValidationError,
     ConfigRequirement,
 )
+from idea_inbox.providers.capabilities import provider_capabilities
 
 
 def test_builtin_registry_reports_enabled_baseline_and_disabled_query_ai() -> None:
@@ -89,6 +90,60 @@ def test_enabled_capability_reports_missing_secret_configuration_without_value()
             "message": "Required secret IDEA_INBOX_OPENAI_API_KEY is missing.",
         }
     ]
+
+
+def test_provider_capability_declarations_are_disabled_and_side_effect_light() -> None:
+    registry = CapabilityRegistry(installed_capabilities=provider_capabilities(), config_values={})
+
+    records = {record.name: record for record in registry.validate().capabilities}
+
+    assert records["model-provider"].status == "disabled"
+    assert records["mock-model-provider"].status == "disabled"
+    assert records["openai-compatible-model-provider"].status == "disabled"
+    assert records["ollama-model-provider"].status == "disabled"
+    assert records["embedding-provider"].status == "disabled"
+    assert records["env-api-key-credentials"].status == "disabled"
+    assert records["static-config-credentials"].status == "disabled"
+    assert records["none-credentials"].status == "disabled"
+
+
+def test_query_ai_requires_selected_provider_capability_when_enabled() -> None:
+    registry = CapabilityRegistry(
+        installed_capabilities=provider_capabilities(),
+        enabled_overrides={"query-ai": True, "model-provider": True},
+        config_values={"IDEA_INBOX_CHAT_PROVIDER": "mock"},
+    )
+
+    record = registry.get_capability("query-ai")
+
+    assert record is not None
+    assert record.status == "misconfigured"
+    assert {
+        "code": "dependency_disabled",
+        "field": "mock-model-provider",
+        "message": "Selected provider capability mock-model-provider is disabled.",
+    } in record.diagnostics
+
+
+def test_query_ai_enables_with_mock_provider_capability_and_config() -> None:
+    registry = CapabilityRegistry(
+        installed_capabilities=provider_capabilities(),
+        enabled_overrides={
+            "query-ai": True,
+            "model-provider": True,
+            "mock-model-provider": True,
+            "none-credentials": True,
+        },
+        config_values={"IDEA_INBOX_CHAT_PROVIDER": "mock"},
+    )
+
+    query = registry.get_capability("query-ai")
+    provider = registry.get_capability("mock-model-provider")
+
+    assert query is not None
+    assert provider is not None
+    assert provider.status == "enabled"
+    assert query.status == "enabled"
 
 
 def test_enabled_capability_reports_disabled_and_unavailable_dependencies() -> None:

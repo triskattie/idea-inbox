@@ -5,8 +5,9 @@ from wsgiref.util import setup_testing_defaults
 
 from idea_inbox.api import create_app
 from idea_inbox.capabilities.registry import CapabilityRegistry
-from idea_inbox.core.capabilities import Capability, CapabilityKind
 from idea_inbox.core.models import Idea, IdeaDraft, RawEvent
+from idea_inbox.providers.capabilities import provider_capabilities
+from idea_inbox.providers.mock import MockModelProvider
 from idea_inbox.storage.sqlite import SQLiteStorageBackend
 
 DISABLED_QUERY_REASON = "Enable and configure the query-ai capability before using POST /v1/query."
@@ -95,16 +96,14 @@ def seed_query_database(database_path: Path) -> None:
 
 
 def deterministic_query_registry() -> CapabilityRegistry:
-    mock_provider = Capability(
-        name="model-provider",
-        kind=CapabilityKind.PROVIDER,
-        dependencies=("core",),
-        default_enabled=True,
-        description="SDK-free deterministic mock provider for cited-query tests.",
-    )
     return CapabilityRegistry(
-        installed_capabilities=(mock_provider,),
-        enabled_overrides={"query-ai": True},
+        installed_capabilities=provider_capabilities(),
+        enabled_overrides={
+            "query-ai": True,
+            "model-provider": True,
+            "mock-model-provider": True,
+            "none-credentials": True,
+        },
         config_values={"IDEA_INBOX_CHAT_PROVIDER": "mock"},
     )
 
@@ -253,6 +252,27 @@ def test_enabled_deterministic_query_returns_stored_idea_answer_with_citations(
         "retrieval": {"strategy": "sqlite_fts", "evidence_count": 1},
     }
     assert "raw payload must stay private" not in json.dumps(payload)
+
+
+def test_enabled_query_uses_injected_model_provider_boundary(tmp_path: Path) -> None:
+    database_path = tmp_path / "ideas.sqlite3"
+    seed_query_database(database_path)
+    app = create_app(
+        database_path=database_path,
+        capability_registry=deterministic_query_registry(),
+        model_provider=MockModelProvider(provider_name="mock-injected"),
+    )
+
+    status, _headers, payload = request(
+        app,
+        "/v1/query",
+        json_body={"query": "What did I save about local AI?", "limit": 5},
+    )
+
+    assert status == "200 OK"
+    assert payload["answer"]["grounding"] == "stored_ideas"
+    assert payload["meta"]["answer_mode"] == "deterministic_mock"
+    assert payload["meta"]["model_provider"] == "mock-injected"
 
 
 def test_enabled_deterministic_query_returns_no_evidence_without_citations(
