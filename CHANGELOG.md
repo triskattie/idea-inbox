@@ -4,7 +4,7 @@ All notable changes to Idea Inbox will be documented here.
 
 The format follows Keep a Changelog-style sections: Added, Changed, Deprecated, Removed, Fixed, Security.
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-08-22
 
 ### Added
 

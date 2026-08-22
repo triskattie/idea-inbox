@@ -310,7 +310,7 @@ def test_docs_describe_v020_release_scope_and_default_disabled_query() -> None:
         assert "default" in doc.lower()
         assert "query-ai" in doc
 
-    assert "## [0.2.0] - Unreleased" in changelog
+    assert "## [0.2.0] - 2026-08-22" in changelog
     assert "Default-disabled cited-query foundation at `POST /v1/query`" in changelog
     assert "General web search" in changelog
     assert "Setting `IDEA_INBOX_CHAT_PROVIDER=mock` alone" in readme
